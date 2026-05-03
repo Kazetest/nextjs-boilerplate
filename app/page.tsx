@@ -45,8 +45,10 @@ export default function Landing() {
         />
       </div>
 
-      <footer className="mt-32 text-xs text-ink-faint">
-        © 2026 NOai · Made by Human Only
+      <footer className="mt-32 text-xs text-ink-faint flex items-center gap-4">
+        <span>© 2026 NOai · Made by Human Only</span>
+        <Link href="/legal/terms" className="hover:text-ink">이용약관</Link>
+        <Link href="/legal/privacy" className="hover:text-ink">개인정보</Link>
       </footer>
     </main>
   );

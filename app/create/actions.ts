@@ -64,6 +64,17 @@ export async function createPost(formData: FormData): Promise<CreateResult> {
     };
   }
 
+  // SightEngine AI 이미지 탐지 (env 미설정 시 자동 스킵)
+  const { detectAIImage } = await import("@/lib/sightengine");
+  const aiCheck = await detectAIImage(image);
+  if (aiCheck.enabled && aiCheck.isAI) {
+    return {
+      error: `AI 생성 이미지로 의심됩니다 (확률 ${Math.round(
+        (aiCheck.score ?? 0) * 100
+      )}%). 카메라 직촬·라이브 사진을 사용해주세요.`,
+    };
+  }
+
   // 이미지 업로드
   const ext = (image.name.split(".").pop() || "jpg").toLowerCase();
   const safeExt = ["jpg", "jpeg", "png", "webp", "heic"].includes(ext)
@@ -121,6 +132,7 @@ export async function createPost(formData: FormData): Promise<CreateResult> {
       caption,
       caption_keystrokes: keystrokes,
       exif_data: exifData,
+      ai_score: aiCheck.score ?? null,
       origin_type: originType,
       origin_post_id: originPostId,
       origin_creator_username: originCreator?.replace(/^@/, "").trim() || null,
