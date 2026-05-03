@@ -1,65 +1,71 @@
-import Image from "next/image";
+import Link from "next/link";
 
-export default function Home() {
+export default function Landing() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <main className="relative z-10 flex flex-1 flex-col items-center justify-center px-6 py-20 max-w-3xl mx-auto text-center w-full">
+      <div className="mb-3 text-[10px] tracking-[0.4em] text-ink-faint uppercase">
+        NO AI · BY HUMAN ONLY
+      </div>
+
+      <h1 className="font-serif text-5xl md:text-7xl font-normal leading-[1.05] tracking-tight mb-10">
+        AI를 쓰지
+        <br />
+        <em className="italic font-normal">못하는</em> SNS
+      </h1>
+
+      <p className="text-lg md:text-xl text-ink-soft leading-relaxed max-w-xl mb-14 font-serif">
+        AI가 다 쓰는 시대에,
+        <br />
+        <span className="text-ink">진짜 사람이 직접 찍고 쓴 것</span>만 모이는 곳.
+      </p>
+
+      <Link
+        href="/login"
+        className="group inline-flex items-center gap-3 px-8 py-4 bg-ink text-bg hover:bg-ink-soft transition-colors text-lg"
+      >
+        시작하기
+        <span className="transition-transform group-hover:translate-x-1">→</span>
+      </Link>
+
+      <div className="mt-24 grid grid-cols-1 md:grid-cols-3 gap-10 text-left max-w-3xl w-full">
+        <Feature
+          n="01"
+          title="카메라 직촬만"
+          desc="갤러리 업로드·AI 생성 이미지 차단. EXIF·메타데이터 검증."
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+        <Feature
+          n="02"
+          title="키스트로크 인증"
+          desc="복사·붙여넣기 차단. 모든 글은 한 글자씩 직접 입력합니다."
+        />
+        <Feature
+          n="03"
+          title="원작 추적"
+          desc="누군가를 따라했다면 출처 필수. 카피가 원작을 추월하는 순간을 보세요."
+        />
+      </div>
+
+      <footer className="mt-32 text-xs text-ink-faint">
+        © 2026 NOai · Made by Human Only
+      </footer>
+    </main>
+  );
+}
+
+function Feature({
+  n,
+  title,
+  desc,
+}: {
+  n: string;
+  title: string;
+  desc: string;
+}) {
+  return (
+    <div className="border-t border-line pt-4">
+      <div className="text-xs text-ink-faint mb-2 tracking-widest">{n}</div>
+      <h3 className="font-serif text-xl mb-2">{title}</h3>
+      <p className="text-sm text-ink-soft leading-relaxed">{desc}</p>
     </div>
   );
 }
