@@ -28,6 +28,11 @@ export function ChatThreadClient({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const lastTsRef = useRef<string>(
+    initialMessages.length > 0
+      ? initialMessages[initialMessages.length - 1].created_at
+      : new Date(0).toISOString()
+  );
 
   useEffect(() => {
     scrollRef.current?.scrollTo({
@@ -36,30 +41,26 @@ export function ChatThreadClient({
     });
   }, [messages.length]);
 
-  // 5초 폴링으로 새 메시지 가져오기 (realtime 없이 가벼운 MVP)
+  // 5초 폴링 — interval은 한 번만 생성 (deps에 messages 넣지 않음)
   useEffect(() => {
     const supabase = createClient();
 
-    const interval = setInterval(async () => {
-      const lastTs =
-        messages.length > 0
-          ? messages[messages.length - 1].created_at
-          : new Date(0).toISOString();
-
+    async function tick() {
       const { data } = await supabase
         .from("messages")
         .select("id, sender_id, body, created_at, read")
         .or(
           `and(sender_id.eq.${meId},recipient_id.eq.${otherId}),and(sender_id.eq.${otherId},recipient_id.eq.${meId})`
         )
-        .gt("created_at", lastTs)
+        .gt("created_at", lastTsRef.current)
         .order("created_at", { ascending: true });
 
       if (data && data.length > 0) {
+        lastTsRef.current = data[data.length - 1].created_at;
         setMessages((prev) => {
           const existing = new Set(prev.map((m) => m.id));
           const additions = data.filter((m) => !existing.has(m.id));
-          return [...prev, ...additions];
+          return additions.length > 0 ? [...prev, ...additions] : prev;
         });
 
         await supabase
@@ -69,10 +70,11 @@ export function ChatThreadClient({
           .eq("sender_id", otherId)
           .eq("read", false);
       }
-    }, 5000);
+    }
 
+    const interval = setInterval(tick, 5000);
     return () => clearInterval(interval);
-  }, [meId, otherId, messages]);
+  }, [meId, otherId]);
 
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
