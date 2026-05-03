@@ -7,6 +7,7 @@ export type PostRow = {
   origin_type: "original" | "inspired_by_user" | "overseas_meme";
   origin_creator_username: string | null;
   origin_label: string | null;
+  exif_data: Record<string, unknown> | null;
   created_at: string;
   author: {
     username: string;
@@ -14,7 +15,35 @@ export type PostRow = {
   } | null;
 };
 
+// EXIF DateTimeOriginal이 게시 시점과 ±10분 이내면 직촬로 인정
+function isFreshlyCaptured(post: PostRow): boolean {
+  const exif = post.exif_data as
+    | { dateTimeOriginal?: string }
+    | null
+    | undefined;
+  const dt = exif?.dateTimeOriginal;
+  if (!dt) return false;
+  // EXIF 형식: "2026:05:03 19:30:00"
+  const m = dt.match(
+    /^(\d{4}):(\d{2}):(\d{2})\s+(\d{2}):(\d{2}):(\d{2})/
+  );
+  if (!m) return false;
+  const [, y, mo, d, h, mi, s] = m;
+  const captured = new Date(
+    Number(y),
+    Number(mo) - 1,
+    Number(d),
+    Number(h),
+    Number(mi),
+    Number(s)
+  ).getTime();
+  const posted = new Date(post.created_at).getTime();
+  const diffMin = Math.abs(posted - captured) / 60000;
+  return diffMin <= 10;
+}
+
 export function PostCard({ post }: { post: PostRow }) {
+  const fresh = isFreshlyCaptured(post);
   return (
     <article className="border border-line bg-bg-card overflow-hidden">
       {/* author */}
@@ -38,6 +67,14 @@ export function PostCard({ post }: { post: PostRow }) {
           alt={post.caption.slice(0, 60)}
           className="w-full h-full object-cover"
         />
+        {fresh && (
+          <div
+            title="EXIF 촬영시각이 게시 시점과 일치 — 직촬 인증"
+            className="absolute top-2 right-2 px-2 py-1 bg-bg/90 backdrop-blur text-xs font-serif text-ink border border-line"
+          >
+            ✓ 직촬
+          </div>
+        )}
       </div>
 
       {/* caption + meta */}

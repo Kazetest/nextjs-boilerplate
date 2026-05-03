@@ -16,7 +16,7 @@ export default async function FeedPage() {
   const { data: posts } = await supabase
     .from("posts")
     .select(
-      `id, image_url, caption, origin_type, origin_creator_username, origin_label, created_at,
+      `id, image_url, caption, origin_type, origin_creator_username, origin_label, exif_data, created_at,
        author:profiles!posts_author_id_fkey(username, display_name)`
     )
     .order("created_at", { ascending: false })

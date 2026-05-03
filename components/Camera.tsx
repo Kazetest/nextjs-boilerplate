@@ -55,15 +55,16 @@ export function Camera({ onImageCaptured }: Props) {
             ref={inputRef}
             type="file"
             accept="image/*"
-            capture="environment"
             onChange={handleCapture}
             className="sr-only"
           />
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-ink-soft">
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-ink-soft text-center px-6">
             <div className="font-serif text-5xl mb-3">◎</div>
-            <div className="font-serif text-lg">카메라로 촬영</div>
-            <div className="text-xs text-ink-faint mt-2">
-              갤러리 업로드는 차단됩니다
+            <div className="font-serif text-lg">사진 선택 또는 촬영</div>
+            <div className="text-xs text-ink-faint mt-2 leading-relaxed">
+              EXIF 촬영시각이 확인된 사진엔 ✓ 직촬 배지가 붙습니다.
+              <br />
+              AI 생성 이미지는 차단됩니다.
             </div>
           </div>
         </label>
