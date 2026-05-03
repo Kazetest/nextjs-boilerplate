@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Noto_Serif_KR, Noto_Sans_KR } from "next/font/google";
 import "./globals.css";
+import { GlobalNav } from "@/components/GlobalNav";
 
 const notoSerif = Noto_Serif_KR({
   subsets: ["latin"],
@@ -42,7 +43,10 @@ export default function RootLayout({
       lang="ko"
       className={`${notoSerif.variable} ${notoSans.variable} h-full`}
     >
-      <body className="min-h-full flex flex-col relative">{children}</body>
+      <body className="min-h-full flex flex-col relative pb-14 sm:pb-0">
+        <GlobalNav />
+        {children}
+      </body>
     </html>
   );
 }

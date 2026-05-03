@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Camera } from "@/components/Camera";
 import { CaptionEditor } from "@/components/CaptionEditor";
 import { OriginPicker, type Origin } from "@/components/OriginPicker";
@@ -10,7 +9,6 @@ import type { KeystrokeRecord } from "@/lib/keystroke";
 import type { ExifResult } from "@/lib/exif";
 
 export default function CreateClient() {
-  const router = useRouter();
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,12 +39,9 @@ export default function CreateClient() {
 
     const result = await createPost(fd);
 
-    if (result.error) {
+    if (result?.error) {
       setError(result.error);
       setSubmitting(false);
-    } else {
-      router.push("/feed");
-      router.refresh();
     }
   }
 

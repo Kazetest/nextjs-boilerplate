@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
 export type CreateResult = { error?: string; postId?: string };
 
@@ -150,5 +151,5 @@ export async function createPost(formData: FormData): Promise<CreateResult> {
   revalidatePath("/feed");
   revalidatePath(`/profile/me`);
 
-  return { postId: inserted.id };
+  redirect(`/post/${inserted.id}`);
 }

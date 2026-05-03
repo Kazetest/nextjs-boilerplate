@@ -111,10 +111,18 @@ export default async function ProfilePage({
           </div>
 
           {!isMe && (
-            <FollowButton
-              targetId={profile.id}
-              initialFollowing={isFollowing}
-            />
+            <div className="flex items-center justify-center gap-3">
+              <FollowButton
+                targetId={profile.id}
+                initialFollowing={isFollowing}
+              />
+              <Link
+                href={`/chat/${profile.username}`}
+                className="px-4 py-2 border border-line hover:border-ink transition-colors text-sm font-serif"
+              >
+                메시지
+              </Link>
+            </div>
           )}
         </div>
 
