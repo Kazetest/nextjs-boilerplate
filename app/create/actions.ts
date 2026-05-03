@@ -26,6 +26,8 @@ export async function createPost(formData: FormData): Promise<CreateResult> {
   const originLabel = (formData.get("originLabel") as string) || null;
 
   if (!image || image.size === 0) return { error: "사진이 필요합니다" };
+  if (image.size > 8 * 1024 * 1024)
+    return { error: "사진은 8MB 이하로 업로드해주세요" };
   if (!caption.trim()) return { error: "캡션이 필요합니다" };
   if (caption.length > 500) return { error: "캡션은 500자 이하" };
 

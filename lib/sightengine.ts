@@ -25,10 +25,13 @@ export async function detectAIImage(file: File): Promise<AICheckResult> {
     fd.append("api_user", apiUser);
     fd.append("api_secret", apiSecret);
 
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8000);
     const res = await fetch("https://api.sightengine.com/1.0/check.json", {
       method: "POST",
       body: fd,
-    });
+      signal: ctrl.signal,
+    }).finally(() => clearTimeout(timer));
 
     if (!res.ok) {
       return { enabled: true, error: `SightEngine ${res.status}` };
