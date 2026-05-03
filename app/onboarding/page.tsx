@@ -12,16 +12,33 @@ export default async function OnboardingPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: profile } = await supabase
+  const { data: profile, error: profileErr } = await supabase
     .from("profiles")
     .select("id, username, display_name, bio")
     .eq("id", user.id)
-    .single();
+    .maybeSingle();
 
-  if (!profile) redirect("/login");
+  if (profileErr) {
+    console.error("[NOai] onboarding profile fetch error:", profileErr);
+  }
 
-  // 이미 username 변경한 사용자는 /feed로
-  if (!profile.username.startsWith("user_")) {
+  // profile 없으면 trigger가 늦었거나 실패한 것 — 직접 생성
+  let safeProfile = profile;
+  if (!safeProfile) {
+    const fallbackUsername = `user_${user.id.slice(0, 8)}`;
+    const { data: created, error: createErr } = await supabase
+      .from("profiles")
+      .insert({ id: user.id, username: fallbackUsername })
+      .select("id, username, display_name, bio")
+      .single();
+    if (createErr || !created) {
+      console.error("[NOai] onboarding profile create failed:", createErr);
+      redirect("/login?error=profile_create_failed");
+    }
+    safeProfile = created;
+  }
+
+  if (!safeProfile.username.startsWith("user_")) {
     redirect("/feed");
   }
 
@@ -45,7 +62,7 @@ export default async function OnboardingPage() {
         </div>
 
         <OnboardingClient
-          currentUsername={profile.username}
+          currentUsername={safeProfile.username}
           email={user.email ?? ""}
         />
       </main>
