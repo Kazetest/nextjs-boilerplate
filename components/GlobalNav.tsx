@@ -11,58 +11,52 @@ export function GlobalNav() {
   const pathname = usePathname() ?? "/";
   const [unread, setUnread] = useState(0);
   const [unreadNotif, setUnreadNotif] = useState(0);
-  const [authed, setAuthed] = useState(false);
+
+  // Hide on landing/auth/onboarding regardless of session state
+  const hidden =
+    pathname === "/" ||
+    NAV_HIDDEN_PATHS.some((p) => pathname.startsWith(p));
 
   useEffect(() => {
-    const supabase = createClient();
+    if (hidden) return;
 
     let cancelled = false;
+    const supabase = createClient();
 
     async function load() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (cancelled) return;
-      if (!user) {
-        setAuthed(false);
-        return;
-      }
-      setAuthed(true);
-      const [{ count: msgCount }, { count: notifCount }] = await Promise.all([
-        supabase
-          .from("messages")
-          .select("id", { count: "exact", head: true })
-          .eq("recipient_id", user.id)
-          .eq("read", false),
-        supabase
-          .from("notifications")
-          .select("id", { count: "exact", head: true })
-          .eq("user_id", user.id)
-          .eq("read", false),
-      ]);
-      if (!cancelled) {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (cancelled || !user) return;
+
+        const [{ count: msgCount }, { count: notifCount }] = await Promise.all([
+          supabase
+            .from("messages")
+            .select("id", { count: "exact", head: true })
+            .eq("recipient_id", user.id)
+            .eq("read", false),
+          supabase
+            .from("notifications")
+            .select("id", { count: "exact", head: true })
+            .eq("user_id", user.id)
+            .eq("read", false),
+        ]);
+        if (cancelled) return;
         setUnread(msgCount ?? 0);
         setUnreadNotif(notifCount ?? 0);
+      } catch {
+        /* lock 충돌 등 — 뱃지 0으로 두고 nav는 그대로 표시 */
       }
     }
 
     load();
-
-    const { data: sub } = supabase.auth.onAuthStateChange(() => load());
-
     return () => {
       cancelled = true;
-      sub?.subscription.unsubscribe();
     };
-  }, [pathname]);
+  }, [pathname, hidden]);
 
-  if (
-    !authed ||
-    pathname === "/" ||
-    NAV_HIDDEN_PATHS.some((p) => pathname.startsWith(p))
-  ) {
-    return null;
-  }
+  if (hidden) return null;
 
   return (
     <>

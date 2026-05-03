@@ -46,29 +46,33 @@ export function ChatThreadClient({
     const supabase = createClient();
 
     async function tick() {
-      const { data } = await supabase
-        .from("messages")
-        .select("id, sender_id, body, created_at, read")
-        .or(
-          `and(sender_id.eq.${meId},recipient_id.eq.${otherId}),and(sender_id.eq.${otherId},recipient_id.eq.${meId})`
-        )
-        .gt("created_at", lastTsRef.current)
-        .order("created_at", { ascending: true });
-
-      if (data && data.length > 0) {
-        lastTsRef.current = data[data.length - 1].created_at;
-        setMessages((prev) => {
-          const existing = new Set(prev.map((m) => m.id));
-          const additions = data.filter((m) => !existing.has(m.id));
-          return additions.length > 0 ? [...prev, ...additions] : prev;
-        });
-
-        await supabase
+      try {
+        const { data } = await supabase
           .from("messages")
-          .update({ read: true })
-          .eq("recipient_id", meId)
-          .eq("sender_id", otherId)
-          .eq("read", false);
+          .select("id, sender_id, body, created_at, read")
+          .or(
+            `and(sender_id.eq.${meId},recipient_id.eq.${otherId}),and(sender_id.eq.${otherId},recipient_id.eq.${meId})`
+          )
+          .gt("created_at", lastTsRef.current)
+          .order("created_at", { ascending: true });
+
+        if (data && data.length > 0) {
+          lastTsRef.current = data[data.length - 1].created_at;
+          setMessages((prev) => {
+            const existing = new Set(prev.map((m) => m.id));
+            const additions = data.filter((m) => !existing.has(m.id));
+            return additions.length > 0 ? [...prev, ...additions] : prev;
+          });
+
+          await supabase
+            .from("messages")
+            .update({ read: true })
+            .eq("recipient_id", meId)
+            .eq("sender_id", otherId)
+            .eq("read", false);
+        }
+      } catch {
+        /* swallow polling errors so the interval keeps ticking */
       }
     }
 
