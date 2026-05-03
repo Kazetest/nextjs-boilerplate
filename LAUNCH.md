@@ -16,13 +16,13 @@
 
 ## 🚦 출시 전 (D-1)
 
-### 도메인 (1순위)
-- [ ] **noai.app** Cloudflare Registrar 구매 (~$20/년)
-- [ ] Vercel → Project Settings → Domains → `noai.app` 추가
-- [ ] Cloudflare DNS에 Vercel CNAME (자동 가이드 따라)
-- [ ] Supabase → Auth → URL Configuration → Site URL을 `https://noai.app`로 교체
-- [ ] Supabase → Auth → Redirect URLs에 `https://noai.app/**` 추가
-- [ ] Google Cloud Console → OAuth Client → Authorized origins/redirects에 `noai.app` 추가
+### 도메인 (1순위) — ✅ noai.kr 가비아 구매 완료
+- [x] **noai.kr** 가비아 구매 (16,500원/년, 클린미션 사업자)
+- [ ] Vercel → Project Settings → Domains → `noai.kr` 추가
+- [ ] 가비아 DNS에 Vercel A/CNAME 레코드 추가
+- [ ] Supabase → Auth → URL Configuration → Site URL을 `https://noai.kr`로 교체
+- [ ] Supabase → Auth → Redirect URLs에 `https://noai.kr/**` 추가
+- [ ] Google Cloud Console → OAuth Client → Authorized origins/redirects에 `noai.kr` 추가
 
 ### SightEngine (선택, 추천)
 - [ ] https://sightengine.com 가입

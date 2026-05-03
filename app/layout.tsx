@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   title: "NOai — AI를 쓰지 못하는 SNS",
   description:
     "AI 시대의 인스타그램. 모든 사진과 글은 진짜 사람이 찍고 쓴 것만.",
-  metadataBase: new URL("https://noai.app"),
+  metadataBase: new URL("https://noai.kr"),
   openGraph: {
     title: "NOai — AI를 쓰지 못하는 SNS",
     description: "Made by Human Only ✍️",
