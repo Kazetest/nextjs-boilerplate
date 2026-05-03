@@ -10,6 +10,7 @@ const NAV_HIDDEN_PATHS = ["/login", "/onboarding", "/auth", "/legal"];
 export function GlobalNav() {
   const pathname = usePathname() ?? "/";
   const [unread, setUnread] = useState(0);
+  const [unreadNotif, setUnreadNotif] = useState(0);
   const [authed, setAuthed] = useState(false);
 
   useEffect(() => {
@@ -27,12 +28,22 @@ export function GlobalNav() {
         return;
       }
       setAuthed(true);
-      const { count } = await supabase
-        .from("messages")
-        .select("id", { count: "exact", head: true })
-        .eq("recipient_id", user.id)
-        .eq("read", false);
-      if (!cancelled) setUnread(count ?? 0);
+      const [{ count: msgCount }, { count: notifCount }] = await Promise.all([
+        supabase
+          .from("messages")
+          .select("id", { count: "exact", head: true })
+          .eq("recipient_id", user.id)
+          .eq("read", false),
+        supabase
+          .from("notifications")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", user.id)
+          .eq("read", false),
+      ]);
+      if (!cancelled) {
+        setUnread(msgCount ?? 0);
+        setUnreadNotif(notifCount ?? 0);
+      }
     }
 
     load();
@@ -65,6 +76,12 @@ export function GlobalNav() {
             <NavLink href="/explore" label="탐색" current={pathname} />
             <NavLink href="/create" label="+ 새 글" current={pathname} />
             <NavLink
+              href="/notifications"
+              label="알림"
+              current={pathname}
+              badge={unreadNotif}
+            />
+            <NavLink
               href="/chat"
               label="채팅"
               current={pathname}
@@ -76,10 +93,16 @@ export function GlobalNav() {
       </header>
 
       <nav className="sm:hidden fixed bottom-0 inset-x-0 z-30 bg-bg/95 backdrop-blur border-t border-line">
-        <div className="max-w-xl mx-auto grid grid-cols-5 text-xs font-serif">
+        <div className="max-w-xl mx-auto grid grid-cols-6 text-xs font-serif">
           <BottomTab href="/feed" label="피드" current={pathname} />
           <BottomTab href="/explore" label="탐색" current={pathname} />
           <BottomTab href="/create" label="＋" current={pathname} />
+          <BottomTab
+            href="/notifications"
+            label="알림"
+            current={pathname}
+            badge={unreadNotif}
+          />
           <BottomTab
             href="/chat"
             label="채팅"
