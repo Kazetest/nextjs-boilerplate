@@ -7,12 +7,29 @@ import Link from "next/link";
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState<"google" | "magic" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleGoogle() {
+    setLoading("google");
+    setError(null);
+    const supabase = createClient();
+    const { error: oauthError } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
+    if (oauthError) {
+      setError(oauthError.message);
+      setLoading(null);
+    }
+    // 성공 시 자동 redirect
+  }
+
+  async function handleMagic(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
+    setLoading("magic");
     setError(null);
 
     const supabase = createClient();
@@ -23,7 +40,7 @@ export default function LoginPage() {
       },
     });
 
-    setLoading(false);
+    setLoading(null);
 
     if (authError) {
       setError(authError.message);
@@ -47,10 +64,29 @@ export default function LoginPage() {
             가입 또는 로그인
           </h1>
           <p className="text-ink-soft mb-10 text-center font-serif">
-            이메일로 마법링크를 보냅니다. 비밀번호 없음.
+            계정 1개 = 사람 1명. AI 봇 가입 차단.
           </p>
 
-          <form onSubmit={handleSubmit} className="w-full space-y-3">
+          {/* Google */}
+          <button
+            type="button"
+            onClick={handleGoogle}
+            disabled={loading !== null}
+            className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-line bg-bg-card hover:border-ink disabled:opacity-50 transition-colors font-serif text-base"
+          >
+            <GoogleIcon />
+            {loading === "google" ? "이동 중..." : "Google로 계속하기"}
+          </button>
+
+          {/* divider */}
+          <div className="w-full flex items-center gap-4 my-6">
+            <div className="flex-1 h-px bg-line" />
+            <span className="text-xs text-ink-faint font-serif">또는</span>
+            <div className="flex-1 h-px bg-line" />
+          </div>
+
+          {/* magic link */}
+          <form onSubmit={handleMagic} className="w-full space-y-3">
             <input
               type="email"
               required
@@ -58,23 +94,23 @@ export default function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
               className="w-full px-4 py-3 bg-bg-card border border-line focus:border-ink outline-none text-ink font-serif text-lg transition-colors"
-              autoFocus
             />
-
             <button
               type="submit"
-              disabled={loading || !email}
-              className="w-full px-4 py-4 bg-ink text-bg hover:bg-ink-soft disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-lg font-serif"
+              disabled={loading !== null || !email}
+              className="w-full px-4 py-3 bg-ink text-bg hover:bg-ink-soft disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-base font-serif"
             >
-              {loading ? "보내는 중..." : "마법링크 받기"}
+              {loading === "magic" ? "보내는 중..." : "이메일로 마법링크 받기"}
             </button>
           </form>
 
           {error && (
-            <p className="mt-4 text-sm text-warn font-serif">{error}</p>
+            <p className="mt-4 text-sm text-warn font-serif text-center">
+              ⚠ {error}
+            </p>
           )}
 
-          <p className="mt-8 text-xs text-ink-faint text-center">
+          <p className="mt-8 text-xs text-ink-faint text-center leading-relaxed">
             가입 시 NOai의 “No AI” 원칙에 동의하는 것으로 간주합니다.
           </p>
         </>
@@ -94,10 +130,33 @@ export default function LoginPage() {
             }}
             className="mt-10 text-sm text-ink-faint hover:text-ink underline underline-offset-4"
           >
-            다른 이메일로 다시
+            다른 방법으로 다시
           </button>
         </div>
       )}
     </main>
+  );
+}
+
+function GoogleIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+      <path
+        d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"
+        fill="#4285F4"
+      />
+      <path
+        d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"
+        fill="#34A853"
+      />
+      <path
+        d="M3.964 10.706A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.706V4.962H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.038l3.007-2.332z"
+        fill="#FBBC05"
+      />
+      <path
+        d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.962L3.964 7.294C4.672 5.167 6.656 3.58 9 3.58z"
+        fill="#EA4335"
+      />
+    </svg>
   );
 }
