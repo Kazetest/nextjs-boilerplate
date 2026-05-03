@@ -25,8 +25,10 @@ export async function detectAIImage(file: File): Promise<AICheckResult> {
     fd.append("api_user", apiUser);
     fd.append("api_secret", apiSecret);
 
+    // Vercel Hobby 10s function timeout과 합산 timeout 방지 — 3.5s.
+    // fail-open: timeout 시 isAI undefined → 게시 통과 (이미지 검사는 후에 보강 가능).
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 8000);
+    const timer = setTimeout(() => ctrl.abort(), 3500);
     const res = await fetch("https://api.sightengine.com/1.0/check.json", {
       method: "POST",
       body: fd,

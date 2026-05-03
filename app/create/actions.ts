@@ -76,10 +76,17 @@ export async function createPost(formData: FormData): Promise<CreateResult> {
     };
   }
 
-  // SightEngine AI 이미지 탐지 (env 미설정 시 자동 스킵)
-  const { detectAIImage } = await import("@/lib/sightengine");
-  const aiCheck = await detectAIImage(image);
-  log("sightengine", { enabled: aiCheck.enabled, score: aiCheck.score, error: aiCheck.error });
+  // SightEngine AI 이미지 탐지 (env 미설정 시 자동 스킵, 4MB 초과 이미지도 스킵 — 응답 지연으로 Vercel timeout 위험)
+  let aiCheck: { enabled: boolean; score?: number; isAI?: boolean; error?: string } = {
+    enabled: false,
+  };
+  if (image.size <= 4 * 1024 * 1024) {
+    const { detectAIImage } = await import("@/lib/sightengine");
+    aiCheck = await detectAIImage(image);
+    log("sightengine", { enabled: aiCheck.enabled, score: aiCheck.score, error: aiCheck.error });
+  } else {
+    log("sightengine skip", { reason: "image > 4MB" });
+  }
   if (aiCheck.enabled && aiCheck.isAI) {
     return {
       error: `AI 생성 이미지로 의심됩니다 (확률 ${Math.round(
