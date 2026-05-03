@@ -89,12 +89,12 @@ export function PostCard({
         </div>
       </header>
 
-      <div className="relative aspect-[4/5] bg-bg">
+      <Link href={`/post/${post.id}`} className="block relative aspect-[4/5] bg-bg group">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={post.image_url}
           alt={post.caption.slice(0, 60)}
-          className="w-full h-full object-cover"
+          className="w-full h-full object-cover group-hover:opacity-95 transition-opacity"
         />
         {fresh && (
           <div
@@ -109,7 +109,7 @@ export function PostCard({
             검토 중
           </div>
         )}
-      </div>
+      </Link>
 
       <div className="px-4 py-3 space-y-2">
         <p className="font-serif text-base leading-relaxed text-ink whitespace-pre-wrap">
