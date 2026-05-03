@@ -10,6 +10,13 @@ const nextConfig: NextConfig = {
       process.env.SUPABASE_ANON_KEY ||
       "",
   },
+  // Server Actions 기본 bodySizeLimit는 1MB. /create는 8MB 이미지까지 허용하므로 올림.
+  // 이걸 안 하면 큰 이미지 업로드 시 'An unexpected response was received from the server' 발생.
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "10mb",
+    },
+  },
 };
 
 export default nextConfig;

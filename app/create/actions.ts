@@ -76,24 +76,9 @@ export async function createPost(formData: FormData): Promise<CreateResult> {
     };
   }
 
-  // SightEngine AI 이미지 탐지 (env 미설정 시 자동 스킵, 4MB 초과 이미지도 스킵 — 응답 지연으로 Vercel timeout 위험)
-  let aiCheck: { enabled: boolean; score?: number; isAI?: boolean; error?: string } = {
-    enabled: false,
-  };
-  if (image.size <= 4 * 1024 * 1024) {
-    const { detectAIImage } = await import("@/lib/sightengine");
-    aiCheck = await detectAIImage(image);
-    log("sightengine", { enabled: aiCheck.enabled, score: aiCheck.score, error: aiCheck.error });
-  } else {
-    log("sightengine skip", { reason: "image > 4MB" });
-  }
-  if (aiCheck.enabled && aiCheck.isAI) {
-    return {
-      error: `AI 생성 이미지로 의심됩니다 (확률 ${Math.round(
-        (aiCheck.score ?? 0) * 100
-      )}%). 카메라 직촬·라이브 사진을 사용해주세요.`,
-    };
-  }
+  // SightEngine을 createPost 흐름에서 제거 — Vercel function timeout 회피.
+  // post 저장 직후 별도 API route(/api/post/[id]/check-ai)로 비동기 호출하여
+  // ai_score 채우고 isAI일 경우 hidden_by_reports 처리.
 
   // 이미지 업로드
   const ext = (image.name.split(".").pop() || "jpg").toLowerCase();
@@ -160,7 +145,7 @@ export async function createPost(formData: FormData): Promise<CreateResult> {
       caption,
       caption_keystrokes: keystrokes,
       exif_data: exifData,
-      ai_score: aiCheck.score ?? null,
+      ai_score: null,
       origin_type: originType,
       origin_post_id: originPostId,
       origin_creator_username: originCreator?.replace(/^@/, "").trim() || null,
