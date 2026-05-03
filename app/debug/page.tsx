@@ -1,204 +1,17 @@
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
+import { ProbeRunner } from "./ProbeRunner";
 
 export const dynamic = "force-dynamic";
 
 type SupaClient = Awaited<ReturnType<typeof createClient>>;
 
-type ProbeResult = {
-  table: string;
-  ok: boolean;
-  detail: string;
-};
+type ProbeRow = { table: string; ok: boolean; detail: string };
 
-type PublishStep = {
-  stage: string;
-  ok: boolean;
-  detail: string;
-  hint?: string;
-};
-
-async function probeTable(
-  supabase: SupaClient,
-  table: string
-): Promise<ProbeResult> {
+async function probeTable(supabase: SupaClient, table: string): Promise<ProbeRow> {
   const { error } = await supabase.from(table).select("*", { count: "exact", head: true });
   if (!error) return { table, ok: true, detail: "OK" };
-  return {
-    table,
-    ok: false,
-    detail: `${error.code ?? "?"} ${error.message}`.slice(0, 140),
-  };
-}
-
-async function simulatePublish(
-  supabase: SupaClient,
-  userId: string
-): Promise<PublishStep[]> {
-  const results: PublishStep[] = [];
-
-  // 1. storage 'posts' bucket 존재 + listable
-  try {
-    const { data: list, error: listErr } = await supabase.storage
-      .from("posts")
-      .list(userId, { limit: 1 });
-    if (listErr) {
-      results.push({
-        stage: "storage 'posts' bucket",
-        ok: false,
-        detail: listErr.message,
-        hint: "supabase/_full_setup.sql 미적용 또는 bucket 수동 삭제됨",
-      });
-    } else {
-      results.push({
-        stage: "storage 'posts' bucket",
-        ok: true,
-        detail: `${list?.length ?? 0}개 객체 (자기 폴더)`,
-      });
-    }
-  } catch (e) {
-    results.push({
-      stage: "storage 'posts' bucket",
-      ok: false,
-      detail: e instanceof Error ? e.message : "unknown",
-    });
-  }
-
-  // 2. upload 권한 — 1바이트 텍스트 → 즉시 삭제
-  const probePath = `${userId}/__probe-${Date.now()}.txt`;
-  try {
-    const blob = new Blob(["x"], { type: "text/plain" });
-    const { error: upErr } = await supabase.storage
-      .from("posts")
-      .upload(probePath, blob, { contentType: "text/plain", upsert: false });
-    if (upErr) {
-      results.push({
-        stage: "storage upload (probe)",
-        ok: false,
-        detail: upErr.message,
-        hint: "RLS 'posts storage upload' 정책 또는 bucket 권한 확인",
-      });
-    } else {
-      results.push({
-        stage: "storage upload (probe)",
-        ok: true,
-        detail: "OK (즉시 삭제됨)",
-      });
-      await supabase.storage.from("posts").remove([probePath]);
-    }
-  } catch (e) {
-    results.push({
-      stage: "storage upload (probe)",
-      ok: false,
-      detail: e instanceof Error ? e.message : "unknown",
-    });
-  }
-
-  // 3. posts insert 권한 — dummy → 즉시 삭제
-  try {
-    const { data: dummy, error: insErr } = await supabase
-      .from("posts")
-      .insert({
-        author_id: userId,
-        image_url: "https://probe.invalid/x.jpg",
-        image_path: "__probe__",
-        caption: "__publish_probe__",
-        origin_type: "original",
-      })
-      .select("id")
-      .single();
-    if (insErr) {
-      const m = insErr.message;
-      let hint: string | undefined;
-      if (/profiles/i.test(m)) hint = "profile row 없음 — /onboarding 먼저";
-      else if (/hidden_by_reports|report_count/i.test(m))
-        hint = "002_moderation 컬럼 누락 — _full_setup.sql 재실행";
-      else if (/violates row-level security/i.test(m))
-        hint = "posts insert RLS 거부 — auth.uid()와 author_id 불일치";
-      results.push({
-        stage: "posts insert (probe)",
-        ok: false,
-        detail: m,
-        hint,
-      });
-    } else if (dummy) {
-      results.push({
-        stage: "posts insert (probe)",
-        ok: true,
-        detail: `OK id=${dummy.id.slice(0, 8)}… (즉시 삭제됨)`,
-      });
-      await supabase.from("posts").delete().eq("id", dummy.id);
-    }
-  } catch (e) {
-    results.push({
-      stage: "posts insert (probe)",
-      ok: false,
-      detail: e instanceof Error ? e.message : "unknown",
-    });
-  }
-
-  // 4. SightEngine ping (활성이면 실제 호출, 응답 시간 측정 — stuck 원인 후보 검증)
-  const seUser = process.env.SIGHTENGINE_API_USER;
-  const seSecret = process.env.SIGHTENGINE_API_SECRET;
-  if (!seUser || !seSecret) {
-    results.push({
-      stage: "SightEngine env",
-      ok: true,
-      detail: "비활성 — AI 이미지 검사 스킵 (이게 stuck 원인은 아님)",
-    });
-  } else {
-    const t0 = Date.now();
-    try {
-      // 1x1 PNG (66바이트 base64) — 실제 호출로 응답 시간 측정
-      const tinyPng = Uint8Array.from(
-        atob(
-          "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
-        ),
-        (c) => c.charCodeAt(0)
-      );
-      const fd = new FormData();
-      fd.append("media", new Blob([tinyPng], { type: "image/png" }), "p.png");
-      fd.append("models", "genai");
-      fd.append("api_user", seUser);
-      fd.append("api_secret", seSecret);
-      const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), 8000);
-      const res = await fetch("https://api.sightengine.com/1.0/check.json", {
-        method: "POST",
-        body: fd,
-        signal: ctrl.signal,
-      }).finally(() => clearTimeout(timer));
-      const ms = Date.now() - t0;
-      if (!res.ok) {
-        results.push({
-          stage: "SightEngine ping",
-          ok: false,
-          detail: `${res.status} ${res.statusText} (${ms}ms)`,
-          hint: "API 키 무효 또는 quota 초과. createPost는 timeout 후 silent skip하므로 stuck 원인은 아님",
-        });
-      } else {
-        results.push({
-          stage: "SightEngine ping",
-          ok: true,
-          detail: `${ms}ms — Vercel Hobby 10s면 upload+insert와 합산 ${ms > 4000 ? "risk" : "OK"}`,
-        });
-      }
-    } catch (e) {
-      const ms = Date.now() - t0;
-      const msg = e instanceof Error ? e.message : "unknown";
-      results.push({
-        stage: "SightEngine ping",
-        ok: false,
-        detail: `${msg} (${ms}ms)`,
-        hint:
-          ms >= 7900
-            ? "8s timeout — SightEngine이 hang. 비활성 권장 (env 제거 또는 키 교체)"
-            : "외부 API 도달 실패",
-      });
-    }
-  }
-
-  return results;
+  return { table, ok: false, detail: `${error.code ?? "?"} ${error.message}`.slice(0, 140) };
 }
 
 export default async function DebugPage() {
@@ -210,7 +23,8 @@ export default async function DebugPage() {
   const env = {
     url: process.env.NEXT_PUBLIC_SUPABASE_URL ?? null,
     hasAnon: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    sightengineUser: !!process.env.SIGHTENGINE_API_USER,
+    sightengineActive:
+      !!process.env.SIGHTENGINE_API_USER && !!process.env.SIGHTENGINE_API_SECRET,
   };
 
   let profile: {
@@ -244,30 +58,62 @@ export default async function DebugPage() {
     ].map((t) => probeTable(supabase, t))
   );
 
-  const publishSim = user ? await simulatePublish(supabase, user.id) : null;
+  const tablesAllOk = probes.every((p) => p.ok);
+  const authOk = !!user;
+  const profileOk = !!profile && !profile.username.startsWith("user_");
 
   return (
-    <main className="max-w-2xl mx-auto px-4 py-10 w-full relative z-10 space-y-10 font-serif">
+    <main className="max-w-3xl mx-auto px-4 py-12 w-full relative z-10 space-y-12 font-serif">
+      {/* Header */}
       <div>
-        <h1 className="text-3xl mb-2">진단</h1>
-        <p className="text-sm text-ink-faint">
-          페르소나 동선 막힘 시 이 페이지에서 어디서 끊겼는지 즉시 확인합니다.
+        <div className="text-[10px] tracking-[0.4em] text-ink-faint uppercase mb-2">
+          DIAGNOSTICS
+        </div>
+        <h1 className="text-4xl mb-3">진단</h1>
+        <p className="text-sm text-ink-faint leading-relaxed max-w-xl">
+          페르소나 동선이 막힐 때 어디서 끊겼는지 한 화면에서 확인합니다.
         </p>
       </div>
 
-      <Section title="1. 인증 상태 (P1 — 가입자 동선)">
-        <Row k="user" v={user ? `${user.id.slice(0, 8)}… (${user.email ?? "no email"})` : "❌ 비로그인"} />
-        <Row
+      {/* Status snapshot */}
+      <div className="grid grid-cols-3 gap-2">
+        <StatusPill label="인증" ok={authOk} hint={user ? "로그인됨" : "비로그인"} />
+        <StatusPill
+          label="프로필"
+          ok={profileOk}
+          hint={
+            profile
+              ? profile.username.startsWith("user_")
+                ? "username 미설정"
+                : `@${profile.username}`
+              : "없음"
+          }
+        />
+        <StatusPill
+          label="DB 테이블"
+          ok={tablesAllOk}
+          hint={`${probes.filter((p) => p.ok).length}/${probes.length}`}
+        />
+      </div>
+
+      {/* P1 — 인증 */}
+      <Section
+        n="01"
+        title="가입자 동선"
+        subtitle="user / profile / 다음 단계"
+      >
+        <KV k="user" v={user ? `${user.email ?? user.id.slice(0, 8) + "…"}` : "❌ 비로그인"} />
+        <KV
           k="profile"
           v={
             profile
-              ? `@${profile.username}${profile.username.startsWith("user_") ? " ⚠ 미설정" : " ✓"}`
+              ? `@${profile.username}${profile.username.startsWith("user_") ? "  (미설정)" : ""}`
               : user
-              ? "❌ 없음 — handle_new_user trigger 미적용/실패. /onboarding 접근 시 self-heal"
+              ? "❌ 없음 — /onboarding 접근 시 self-heal"
               : "—"
           }
         />
-        <Row
+        <KV
           k="다음 동선"
           v={
             !user ? (
@@ -276,127 +122,200 @@ export default async function DebugPage() {
               </Link>
             ) : !profile || profile.username.startsWith("user_") ? (
               <Link href="/onboarding" className="text-ink underline">
-                /onboarding (username 미설정) →
+                /onboarding →
               </Link>
             ) : (
               <Link href="/feed" className="text-ink underline">
-                /feed (정상) →
+                /feed →
               </Link>
             )
           }
         />
       </Section>
 
-      <Section title="2. Supabase 환경 (모든 페르소나 공통)">
-        <Row k="NEXT_PUBLIC_SUPABASE_URL" v={env.url ? new URL(env.url).host : "❌ 없음"} />
-        <Row k="NEXT_PUBLIC_SUPABASE_ANON_KEY" v={env.hasAnon ? "✓" : "❌ 없음"} />
-        <Row k="SIGHTENGINE_API_USER" v={env.sightengineUser ? "✓ (AI 이미지 검사 활성)" : "— (생략됨, AI 검사 스킵)"} />
+      {/* Env */}
+      <Section n="02" title="환경" subtitle="Supabase / SightEngine">
+        <KV
+          k="SUPABASE_URL"
+          v={env.url ? new URL(env.url).host : "❌ 없음"}
+          ok={!!env.url}
+        />
+        <KV
+          k="ANON_KEY"
+          v={env.hasAnon ? "✓ 주입됨" : "❌ 없음"}
+          ok={env.hasAnon}
+        />
+        <KV
+          k="SightEngine"
+          v={env.sightengineActive ? "활성 (AI 검사 ON)" : "비활성 (검사 스킵)"}
+          ok={true}
+        />
       </Section>
 
-      <Section title="3. 마이그레이션 적용 여부 (P2/P3/P4 동선)">
-        {probes.map((p) => (
-          <Row
-            key={p.table}
-            k={p.table}
-            v={p.ok ? "✓" : `❌ ${p.detail}`}
-            hint={tableHint(p.table)}
-          />
-        ))}
-      </Section>
-
-      <Section title="4. P2 게시 동선 시뮬레이션 (storage upload + posts insert dry-run)">
-        {!publishSim ? (
-          <Row k="—" v="로그인 후 표시됩니다" />
-        ) : (
-          publishSim.map((p) => (
-            <Row
-              key={p.stage}
-              k={p.stage}
-              v={p.ok ? `✓ ${p.detail}` : `❌ ${p.detail}`}
-              hint={p.hint}
+      {/* DB 적용 여부 */}
+      <Section n="03" title="DB 마이그레이션" subtitle="P2/P3/P4 의존">
+        <div className="grid grid-cols-2 gap-x-3">
+          {probes.map((p) => (
+            <KV
+              key={p.table}
+              k={p.table}
+              v={p.ok ? "✓" : "❌ " + p.detail.slice(0, 60)}
+              ok={p.ok}
+              dense
             />
-          ))
+          ))}
+        </div>
+        {!tablesAllOk && (
+          <div className="mt-3 px-3 py-2 border border-warn/30 bg-warn/5 text-warn text-xs font-serif">
+            ❌ 있는 테이블 →{" "}
+            <a
+              href="https://github.com/Kazetest/nextjs-boilerplate/blob/main/supabase/_full_setup.sql"
+              target="_blank"
+              rel="noreferrer"
+              className="underline"
+            >
+              _full_setup.sql
+            </a>
+            을 Supabase SQL Editor에 한 번 붙여넣고 Run하세요.
+          </div>
         )}
       </Section>
 
-      <Section title="5. 페르소나 동선 빠른 점프">
-        <ul className="space-y-2 text-sm">
-          <li>
-            <span className="text-ink-faint">P1 신규 →</span>{" "}
-            <Link className="underline" href="/login">/login</Link> →{" "}
-            <Link className="underline" href="/onboarding">/onboarding</Link> →{" "}
-            <Link className="underline" href="/feed">/feed</Link>
-          </li>
-          <li>
-            <span className="text-ink-faint">P2 창작 →</span>{" "}
-            <Link className="underline" href="/create">/create</Link>
-          </li>
-          <li>
-            <span className="text-ink-faint">P3 탐색 →</span>{" "}
-            <Link className="underline" href="/explore">/explore</Link> ·{" "}
-            <Link className="underline" href="/profile/me">/profile/me</Link>
-          </li>
-          <li>
-            <span className="text-ink-faint">P4 소통 →</span>{" "}
-            <Link className="underline" href="/chat">/chat</Link> ·{" "}
-            <Link className="underline" href="/notifications">/notifications</Link>
-          </li>
-        </ul>
+      {/* P2 — Live Probe */}
+      <Section
+        n="04"
+        title="P2 게시 동선 라이브 시뮬"
+        subtitle="storage upload + posts insert + SightEngine ping (실측 ms)"
+      >
+        {!user ? (
+          <p className="text-sm text-ink-faint font-serif">
+            로그인 후 실행 가능합니다.
+          </p>
+        ) : (
+          <ProbeRunner />
+        )}
+      </Section>
+
+      {/* Quick jump */}
+      <Section n="05" title="페르소나 빠른 점프">
+        <div className="grid grid-cols-2 gap-2 text-sm">
+          <JumpLink p="P1" label="가입" href="/login" />
+          <JumpLink p="P1" label="아이디 설정" href="/onboarding" />
+          <JumpLink p="P2" label="새 글 쓰기" href="/create" />
+          <JumpLink p="P3" label="피드" href="/feed" />
+          <JumpLink p="P3" label="탐색" href="/explore" />
+          <JumpLink p="P3" label="내 프로필" href="/profile/me" />
+          <JumpLink p="P4" label="채팅" href="/chat" />
+          <JumpLink p="P4" label="알림" href="/notifications" />
+        </div>
       </Section>
     </main>
   );
 }
 
-function Section({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section>
-      <h2 className="text-xs tracking-[0.3em] text-ink-faint uppercase mb-3">{title}</h2>
-      <div className="border border-line divide-y divide-line">{children}</div>
-    </section>
-  );
-}
-
-function Row({
-  k,
-  v,
+function StatusPill({
+  label,
+  ok,
   hint,
 }: {
-  k: string;
-  v: React.ReactNode;
-  hint?: string;
+  label: string;
+  ok: boolean;
+  hint: string;
 }) {
   return (
-    <div className="px-3 py-2 grid grid-cols-[160px_1fr] gap-3 items-start">
-      <span className="text-xs text-ink-faint pt-1">{k}</span>
-      <div className="text-sm break-all">
-        <div>{v}</div>
-        {hint && <div className="text-[11px] text-ink-faint mt-1">{hint}</div>}
+    <div
+      className={`px-3 py-3 border text-center ${
+        ok ? "border-emerald-500/30 bg-emerald-500/5" : "border-warn/40 bg-warn/5"
+      }`}
+    >
+      <div className={`text-2xl mb-0.5 ${ok ? "text-emerald-400" : "text-warn"}`}>
+        {ok ? "✓" : "✕"}
       </div>
+      <div className="text-[10px] tracking-[0.3em] text-ink-faint uppercase">
+        {label}
+      </div>
+      <div className="text-xs text-ink-soft mt-1 truncate font-serif">{hint}</div>
     </div>
   );
 }
 
-function tableHint(t: string): string | undefined {
-  switch (t) {
-    case "profiles":
-    case "posts":
-    case "comments":
-    case "follows":
-    case "reactions":
-      return "schema.sql";
-    case "reports":
-    case "blocks":
-    case "user_strikes":
-      return "002_moderation.sql";
-    case "messages":
-      return "003_messages.sql";
-    case "notifications":
-      return "004_notifications.sql";
-  }
+function Section({
+  n,
+  title,
+  subtitle,
+  children,
+}: {
+  n: string;
+  title: string;
+  subtitle?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="border-t border-line pt-6">
+      <div className="mb-4">
+        <div className="text-[10px] tracking-[0.3em] text-ink-faint mb-1">
+          {n}
+        </div>
+        <h2 className="text-2xl">{title}</h2>
+        {subtitle && (
+          <p className="text-xs text-ink-faint mt-1 font-serif">{subtitle}</p>
+        )}
+      </div>
+      <div>{children}</div>
+    </section>
+  );
+}
+
+function KV({
+  k,
+  v,
+  ok,
+  dense,
+}: {
+  k: string;
+  v: React.ReactNode;
+  ok?: boolean;
+  dense?: boolean;
+}) {
+  return (
+    <div
+      className={`grid grid-cols-[140px_1fr] items-baseline gap-3 ${
+        dense ? "py-1" : "py-2"
+      } border-b border-line/40 last:border-0`}
+    >
+      <span className="text-xs text-ink-faint truncate">{k}</span>
+      <span
+        className={`text-sm break-all ${
+          ok === false ? "text-warn" : ok === true ? "text-emerald-400" : "text-ink"
+        }`}
+      >
+        {v}
+      </span>
+    </div>
+  );
+}
+
+function JumpLink({
+  p,
+  label,
+  href,
+}: {
+  p: string;
+  label: string;
+  href: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="border border-line px-3 py-2 hover:border-ink transition-colors flex items-center justify-between group"
+    >
+      <span className="text-sm font-serif">{label}</span>
+      <span className="flex items-center gap-2">
+        <span className="text-[10px] tracking-widest text-ink-faint">{p}</span>
+        <span className="text-ink-faint group-hover:text-ink transition-colors">
+          →
+        </span>
+      </span>
+    </Link>
+  );
 }

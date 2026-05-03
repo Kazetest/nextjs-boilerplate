@@ -132,7 +132,12 @@ export default function CreateClient() {
           <h2 className="font-serif text-2xl text-center">원작 출처</h2>
           <OriginPicker value={origin} onChange={setOrigin} />
           {error && (
-            <p className="text-sm text-warn font-serif text-center">⚠ {error}</p>
+            <div className="px-4 py-3 border border-warn/40 bg-warn/5 text-warn text-sm font-serif leading-relaxed">
+              <span className="block mb-0.5 text-[10px] tracking-[0.3em] uppercase opacity-70">
+                Error
+              </span>
+              {error}
+            </div>
           )}
           <div className="flex gap-3">
             <button
@@ -145,9 +150,16 @@ export default function CreateClient() {
             <button
               onClick={handleSubmit}
               disabled={submitting || !imageFile || !caption.trim()}
-              className="flex-1 px-4 py-3 bg-ink text-bg hover:bg-ink-soft disabled:opacity-40 transition-colors font-serif"
+              className="flex-1 px-4 py-3 bg-ink text-bg hover:bg-ink-soft disabled:opacity-40 transition-colors font-serif inline-flex items-center justify-center gap-2"
             >
-              {submitting ? "게시 중..." : "게시"}
+              {submitting ? (
+                <>
+                  <LoadingDots />
+                  <span>게시 중</span>
+                </>
+              ) : (
+                "게시"
+              )}
             </button>
           </div>
         </div>
@@ -156,28 +168,62 @@ export default function CreateClient() {
   );
 }
 
+const STEP_LABELS = ["촬영", "캡션", "원작"];
+
+function LoadingDots() {
+  return (
+    <span className="inline-flex gap-1" aria-label="loading">
+      <span className="w-1.5 h-1.5 bg-bg rounded-full animate-pulse [animation-delay:-0.3s]" />
+      <span className="w-1.5 h-1.5 bg-bg rounded-full animate-pulse [animation-delay:-0.15s]" />
+      <span className="w-1.5 h-1.5 bg-bg rounded-full animate-pulse" />
+    </span>
+  );
+}
+
 function Stepper({ current }: { current: number }) {
   return (
-    <div className="flex items-center justify-center gap-2 mb-12 text-xs">
-      {[1, 2, 3].map((n) => (
-        <div
-          key={n}
-          className={`flex items-center gap-2 ${
-            n === current ? "text-ink" : "text-ink-faint"
-          }`}
-        >
-          <span
-            className={`w-7 h-7 flex items-center justify-center rounded-full border font-serif ${
-              n === current
-                ? "border-ink bg-ink text-bg"
-                : "border-line"
-            }`}
-          >
-            {n}
-          </span>
-          {n < 3 && <span className="w-8 h-px bg-line" />}
-        </div>
-      ))}
+    <div className="mb-12">
+      <div className="flex items-center justify-center gap-3">
+        {[1, 2, 3].map((n) => {
+          const done = n < current;
+          const active = n === current;
+          return (
+            <div key={n} className="flex items-center gap-3">
+              <div
+                className={`flex flex-col items-center gap-1.5 transition-colors ${
+                  active ? "text-ink" : done ? "text-ink-soft" : "text-ink-faint"
+                }`}
+              >
+                <span
+                  className={`w-8 h-8 flex items-center justify-center text-xs font-serif border transition-all ${
+                    active
+                      ? "border-ink bg-ink text-bg scale-110"
+                      : done
+                      ? "border-ink-soft bg-ink-soft/10 text-ink"
+                      : "border-line"
+                  }`}
+                >
+                  {done ? "✓" : n}
+                </span>
+                <span
+                  className={`text-[10px] tracking-[0.2em] font-serif uppercase ${
+                    active ? "text-ink" : "text-ink-faint"
+                  }`}
+                >
+                  {STEP_LABELS[n - 1]}
+                </span>
+              </div>
+              {n < 3 && (
+                <span
+                  className={`w-10 h-px transition-colors ${
+                    done ? "bg-ink-soft" : "bg-line"
+                  }`}
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
