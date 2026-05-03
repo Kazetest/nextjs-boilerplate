@@ -1,13 +1,18 @@
 import Link from "next/link";
+import { tokenizeCaption } from "@/lib/hashtag";
+import { PostMenu } from "@/components/PostMenu";
 
 export type PostRow = {
   id: string;
+  author_id?: string;
   image_url: string;
   caption: string;
   origin_type: "original" | "inspired_by_user" | "overseas_meme";
   origin_creator_username: string | null;
   origin_label: string | null;
   exif_data: Record<string, unknown> | null;
+  hidden_by_reports?: boolean;
+  report_count?: number;
   created_at: string;
   author: {
     username: string;
@@ -15,7 +20,6 @@ export type PostRow = {
   } | null;
 };
 
-// EXIF DateTimeOriginal이 게시 시점과 ±10분 이내면 직촬로 인정
 function isFreshlyCaptured(post: PostRow): boolean {
   const exif = post.exif_data as
     | { dateTimeOriginal?: string }
@@ -23,7 +27,6 @@ function isFreshlyCaptured(post: PostRow): boolean {
     | undefined;
   const dt = exif?.dateTimeOriginal;
   if (!dt) return false;
-  // EXIF 형식: "2026:05:03 19:30:00"
   const m = dt.match(
     /^(\d{4}):(\d{2}):(\d{2})\s+(\d{2}):(\d{2}):(\d{2})/
   );
@@ -38,15 +41,32 @@ function isFreshlyCaptured(post: PostRow): boolean {
     Number(s)
   ).getTime();
   const posted = new Date(post.created_at).getTime();
-  const diffMin = Math.abs(posted - captured) / 60000;
-  return diffMin <= 10;
+  return Math.abs(posted - captured) / 60000 <= 10;
 }
 
-export function PostCard({ post }: { post: PostRow }) {
+export function PostCard({
+  post,
+  currentUserId,
+}: {
+  post: PostRow;
+  currentUserId?: string;
+}) {
   const fresh = isFreshlyCaptured(post);
+  const isOwn = !!currentUserId && currentUserId === post.author_id;
+  const flagged = !!post.hidden_by_reports;
+
+  if (flagged && !isOwn) {
+    return (
+      <article className="border border-line bg-bg-card p-6 text-center text-ink-faint">
+        <p className="font-serif text-sm">
+          ⚠ 커뮤니티 신고로 검토 중인 게시물입니다.
+        </p>
+      </article>
+    );
+  }
+
   return (
     <article className="border border-line bg-bg-card overflow-hidden">
-      {/* author */}
       <header className="px-4 py-3 flex items-center justify-between border-b border-line">
         <Link
           href={`/profile/${post.author?.username ?? "unknown"}`}
@@ -54,12 +74,21 @@ export function PostCard({ post }: { post: PostRow }) {
         >
           @{post.author?.username ?? "unknown"}
         </Link>
-        <span className="text-xs text-ink-faint">
-          {timeAgo(post.created_at)}
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-ink-faint">
+            {timeAgo(post.created_at)}
+          </span>
+          {post.author_id && (
+            <PostMenu
+              postId={post.id}
+              authorId={post.author_id}
+              authorUsername={post.author?.username ?? "unknown"}
+              isOwn={isOwn}
+            />
+          )}
+        </div>
       </header>
 
-      {/* image */}
       <div className="relative aspect-[4/5] bg-bg">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -75,12 +104,16 @@ export function PostCard({ post }: { post: PostRow }) {
             ✓ 직촬
           </div>
         )}
+        {flagged && isOwn && (
+          <div className="absolute top-2 left-2 px-2 py-1 bg-warn/90 text-bg text-xs font-serif">
+            검토 중
+          </div>
+        )}
       </div>
 
-      {/* caption + meta */}
       <div className="px-4 py-3 space-y-2">
         <p className="font-serif text-base leading-relaxed text-ink whitespace-pre-wrap">
-          {post.caption}
+          <CaptionWithTags text={post.caption} />
         </p>
         <OriginBadge post={post} />
       </div>
@@ -88,12 +121,31 @@ export function PostCard({ post }: { post: PostRow }) {
   );
 }
 
+function CaptionWithTags({ text }: { text: string }) {
+  const tokens = tokenizeCaption(text);
+  return (
+    <>
+      {tokens.map((t, i) =>
+        t.type === "text" ? (
+          <span key={i}>{t.value}</span>
+        ) : (
+          <Link
+            key={i}
+            href={`/tag/${encodeURIComponent(t.tag.toLowerCase())}`}
+            className="text-ink-soft hover:text-ink underline-offset-2 hover:underline"
+          >
+            #{t.tag}
+          </Link>
+        )
+      )}
+    </>
+  );
+}
+
 function OriginBadge({ post }: { post: PostRow }) {
   if (post.origin_type === "original") {
     return (
-      <div className="text-xs text-ink-faint font-serif">
-        ✦ 오리지널
-      </div>
+      <div className="text-xs text-ink-faint font-serif">✦ 오리지널</div>
     );
   }
   if (post.origin_type === "inspired_by_user" && post.origin_creator_username) {

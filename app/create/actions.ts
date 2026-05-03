@@ -55,6 +55,15 @@ export async function createPost(formData: FormData): Promise<CreateResult> {
     return { error: "원작 유형 오류" };
   }
 
+  // AI 의심 해시태그 자동 검출 — 사용자가 직접 #ai 등을 박았다면 본인 인정으로 간주, 차단
+  const { detectAiHashtags } = await import("@/lib/hashtag");
+  const aiTags = detectAiHashtags(caption);
+  if (aiTags.length > 0) {
+    return {
+      error: `AI 관련 해시태그가 감지됐습니다 (#${aiTags.join(", #")}). NOai는 AI 콘텐츠를 받지 않습니다.`,
+    };
+  }
+
   // 이미지 업로드
   const ext = (image.name.split(".").pop() || "jpg").toLowerCase();
   const safeExt = ["jpg", "jpeg", "png", "webp", "heic"].includes(ext)
