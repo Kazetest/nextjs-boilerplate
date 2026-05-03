@@ -13,18 +13,25 @@ export default function LoginPage() {
   async function handleGoogle() {
     setLoading("google");
     setError(null);
-    const supabase = createClient();
-    const { error: oauthError } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
-    if (oauthError) {
-      setError(oauthError.message);
+    try {
+      const supabase = createClient();
+      const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+      console.log("[NOai] OAuth response:", { data, oauthError });
+      if (oauthError) {
+        setError(oauthError.message);
+        setLoading(null);
+      }
+      // data.url 있으면 자동 redirect
+    } catch (e) {
+      console.error("[NOai] OAuth threw:", e);
+      setError(e instanceof Error ? e.message : "Google 로그인 실패");
       setLoading(null);
     }
-    // 성공 시 자동 redirect
   }
 
   async function handleMagic(e: React.FormEvent) {
