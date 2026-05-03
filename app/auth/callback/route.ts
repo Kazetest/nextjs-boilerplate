@@ -11,6 +11,20 @@ export async function GET(request: Request) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error) {
+      // 신규 가입자는 /onboarding으로 (username이 user_xxx 형식인 경우)
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("username")
+          .eq("id", user.id)
+          .single();
+        if (profile?.username?.startsWith("user_")) {
+          return NextResponse.redirect(`${origin}/onboarding`);
+        }
+      }
       return NextResponse.redirect(`${origin}${next}`);
     }
   }

@@ -1,7 +1,16 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PROTECTED_ROUTES = ["/feed", "/create", "/profile", "/trend"];
+const PROTECTED_ROUTES = [
+  "/feed",
+  "/create",
+  "/profile",
+  "/trend",
+  "/explore",
+  "/onboarding",
+  "/post",
+  "/tag",
+];
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });

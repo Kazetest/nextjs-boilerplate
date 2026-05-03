@@ -145,7 +145,15 @@ function CaptionWithTags({ text }: { text: string }) {
 function OriginBadge({ post }: { post: PostRow }) {
   if (post.origin_type === "original") {
     return (
-      <div className="text-xs text-ink-faint font-serif">✦ 오리지널</div>
+      <div className="flex items-center gap-2 text-xs font-serif">
+        <span className="text-ink-faint">✦ 오리지널</span>
+        <Link
+          href={`/trend/${post.id}`}
+          className="text-ink-faint hover:text-ink underline underline-offset-2"
+        >
+          트렌드 보기 →
+        </Link>
+      </div>
     );
   }
   if (post.origin_type === "inspired_by_user" && post.origin_creator_username) {
@@ -157,6 +165,13 @@ function OriginBadge({ post }: { post: PostRow }) {
           className="text-ink underline underline-offset-2"
         >
           @{post.origin_creator_username}
+        </Link>
+        {" · "}
+        <Link
+          href={`/trend/${post.id}`}
+          className="text-ink-faint hover:text-ink underline underline-offset-2"
+        >
+          트렌드
         </Link>
       </div>
     );
