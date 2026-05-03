@@ -3,24 +3,152 @@ import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
+type SupaClient = Awaited<ReturnType<typeof createClient>>;
+
 type ProbeResult = {
   table: string;
   ok: boolean;
   detail: string;
 };
 
+type PublishStep = {
+  stage: string;
+  ok: boolean;
+  detail: string;
+  hint?: string;
+};
+
 async function probeTable(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: SupaClient,
   table: string
 ): Promise<ProbeResult> {
   const { error } = await supabase.from(table).select("*", { count: "exact", head: true });
   if (!error) return { table, ok: true, detail: "OK" };
-  // PGRST205 = relation not found
   return {
     table,
     ok: false,
     detail: `${error.code ?? "?"} ${error.message}`.slice(0, 140),
   };
+}
+
+async function simulatePublish(
+  supabase: SupaClient,
+  userId: string
+): Promise<PublishStep[]> {
+  const results: PublishStep[] = [];
+
+  // 1. storage 'posts' bucket 존재 + listable
+  try {
+    const { data: list, error: listErr } = await supabase.storage
+      .from("posts")
+      .list(userId, { limit: 1 });
+    if (listErr) {
+      results.push({
+        stage: "storage 'posts' bucket",
+        ok: false,
+        detail: listErr.message,
+        hint: "supabase/_full_setup.sql 미적용 또는 bucket 수동 삭제됨",
+      });
+    } else {
+      results.push({
+        stage: "storage 'posts' bucket",
+        ok: true,
+        detail: `${list?.length ?? 0}개 객체 (자기 폴더)`,
+      });
+    }
+  } catch (e) {
+    results.push({
+      stage: "storage 'posts' bucket",
+      ok: false,
+      detail: e instanceof Error ? e.message : "unknown",
+    });
+  }
+
+  // 2. upload 권한 — 1바이트 텍스트 → 즉시 삭제
+  const probePath = `${userId}/__probe-${Date.now()}.txt`;
+  try {
+    const blob = new Blob(["x"], { type: "text/plain" });
+    const { error: upErr } = await supabase.storage
+      .from("posts")
+      .upload(probePath, blob, { contentType: "text/plain", upsert: false });
+    if (upErr) {
+      results.push({
+        stage: "storage upload (probe)",
+        ok: false,
+        detail: upErr.message,
+        hint: "RLS 'posts storage upload' 정책 또는 bucket 권한 확인",
+      });
+    } else {
+      results.push({
+        stage: "storage upload (probe)",
+        ok: true,
+        detail: "OK (즉시 삭제됨)",
+      });
+      await supabase.storage.from("posts").remove([probePath]);
+    }
+  } catch (e) {
+    results.push({
+      stage: "storage upload (probe)",
+      ok: false,
+      detail: e instanceof Error ? e.message : "unknown",
+    });
+  }
+
+  // 3. posts insert 권한 — dummy → 즉시 삭제
+  try {
+    const { data: dummy, error: insErr } = await supabase
+      .from("posts")
+      .insert({
+        author_id: userId,
+        image_url: "https://probe.invalid/x.jpg",
+        image_path: "__probe__",
+        caption: "__publish_probe__",
+        origin_type: "original",
+      })
+      .select("id")
+      .single();
+    if (insErr) {
+      const m = insErr.message;
+      let hint: string | undefined;
+      if (/profiles/i.test(m)) hint = "profile row 없음 — /onboarding 먼저";
+      else if (/hidden_by_reports|report_count/i.test(m))
+        hint = "002_moderation 컬럼 누락 — _full_setup.sql 재실행";
+      else if (/violates row-level security/i.test(m))
+        hint = "posts insert RLS 거부 — auth.uid()와 author_id 불일치";
+      results.push({
+        stage: "posts insert (probe)",
+        ok: false,
+        detail: m,
+        hint,
+      });
+    } else if (dummy) {
+      results.push({
+        stage: "posts insert (probe)",
+        ok: true,
+        detail: `OK id=${dummy.id.slice(0, 8)}… (즉시 삭제됨)`,
+      });
+      await supabase.from("posts").delete().eq("id", dummy.id);
+    }
+  } catch (e) {
+    results.push({
+      stage: "posts insert (probe)",
+      ok: false,
+      detail: e instanceof Error ? e.message : "unknown",
+    });
+  }
+
+  // 4. SightEngine env (활성 시 응답 시간 한도가 Vercel timeout과 충돌하기 쉬움)
+  const seActive =
+    !!process.env.SIGHTENGINE_API_USER && !!process.env.SIGHTENGINE_API_SECRET;
+  results.push({
+    stage: "SightEngine env",
+    ok: true,
+    detail: seActive
+      ? "활성 — 8s timeout. Vercel Hobby(10s)면 upload+insert와 합산 risk"
+      : "비활성 — AI 이미지 검사 스킵 (게시 stuck 원인 후보 제거)",
+  });
+
+  return results;
 }
 
 export default async function DebugPage() {
@@ -65,6 +193,8 @@ export default async function DebugPage() {
       "notifications",
     ].map((t) => probeTable(supabase, t))
   );
+
+  const publishSim = user ? await simulatePublish(supabase, user.id) : null;
 
   return (
     <main className="max-w-2xl mx-auto px-4 py-10 w-full relative z-10 space-y-10 font-serif">
@@ -124,7 +254,22 @@ export default async function DebugPage() {
         ))}
       </Section>
 
-      <Section title="4. 페르소나 동선 빠른 점프">
+      <Section title="4. P2 게시 동선 시뮬레이션 (storage upload + posts insert dry-run)">
+        {!publishSim ? (
+          <Row k="—" v="로그인 후 표시됩니다" />
+        ) : (
+          publishSim.map((p) => (
+            <Row
+              key={p.stage}
+              k={p.stage}
+              v={p.ok ? `✓ ${p.detail}` : `❌ ${p.detail}`}
+              hint={p.hint}
+            />
+          ))
+        )}
+      </Section>
+
+      <Section title="5. 페르소나 동선 빠른 점프">
         <ul className="space-y-2 text-sm">
           <li>
             <span className="text-ink-faint">P1 신규 →</span>{" "}
