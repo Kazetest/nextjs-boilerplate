@@ -22,8 +22,10 @@ export default async function ProfilePage({
       .from("profiles")
       .select("username")
       .eq("id", user.id)
-      .single();
+      .maybeSingle();
     if (me) redirect(`/profile/${me.username}`);
+    // profile 없는 신규 user는 onboarding으로 (handle_new_user trigger 미적용/실패 시 self-heal)
+    redirect("/onboarding");
   }
 
   const { data: profile } = await supabase

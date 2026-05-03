@@ -57,7 +57,7 @@ export default async function PostPage({
     .from("profiles")
     .select("username")
     .eq("id", user.id)
-    .single();
+    .maybeSingle();
 
   const keystrokes = post.caption_keystrokes as KeystrokeRecord | null;
 
