@@ -90,7 +90,12 @@ export function OnboardingClient({
       </div>
 
       {error && (
-        <p className="text-sm text-warn font-serif text-center">⚠ {error}</p>
+        <div className="px-4 py-3 border border-warn/40 bg-warn/5 text-warn text-sm font-serif leading-relaxed">
+          <span className="block mb-0.5 text-[10px] tracking-[0.3em] uppercase opacity-70">
+            Error
+          </span>
+          {error}
+        </div>
       )}
 
       <button
