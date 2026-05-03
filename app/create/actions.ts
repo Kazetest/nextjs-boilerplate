@@ -4,15 +4,24 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+// Vercel function timeout — Hobby는 10초가 강제 상한. Pro에서만 늘어남.
+// 10초 안에 끝내려면 SightEngine 호출은 짧아야 함.
+export const maxDuration = 60;
+
 export type CreateResult = { error?: string; postId?: string };
 
 export async function createPost(formData: FormData): Promise<CreateResult> {
+  const t0 = Date.now();
+  const log = (stage: string, extra: Record<string, unknown> = {}) =>
+    console.log(`[NOai/createPost] ${stage}`, { ms: Date.now() - t0, ...extra });
+
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) return { error: "로그인이 필요합니다" };
+  log("auth ok", { userId: user.id });
 
   const image = formData.get("image") as File | null;
   const caption = (formData.get("caption") as string) ?? "";
@@ -70,6 +79,7 @@ export async function createPost(formData: FormData): Promise<CreateResult> {
   // SightEngine AI 이미지 탐지 (env 미설정 시 자동 스킵)
   const { detectAIImage } = await import("@/lib/sightengine");
   const aiCheck = await detectAIImage(image);
+  log("sightengine", { enabled: aiCheck.enabled, score: aiCheck.score, error: aiCheck.error });
   if (aiCheck.enabled && aiCheck.isAI) {
     return {
       error: `AI 생성 이미지로 의심됩니다 (확률 ${Math.round(
@@ -92,7 +102,15 @@ export async function createPost(formData: FormData): Promise<CreateResult> {
       upsert: false,
     });
 
-  if (uploadError) return { error: `업로드 실패: ${uploadError.message}` };
+  if (uploadError) {
+    log("upload failed", { msg: uploadError.message });
+    // 흔한 원인: storage bucket 'posts'가 없음 (schema.sql 미적용)
+    const hint = /bucket/i.test(uploadError.message)
+      ? " — Supabase에 'posts' 버킷이 없습니다. supabase/_full_setup.sql 적용 필요."
+      : "";
+    return { error: `업로드 실패: ${uploadError.message}${hint}` };
+  }
+  log("upload ok", { path });
 
   const {
     data: { publicUrl },
@@ -145,10 +163,18 @@ export async function createPost(formData: FormData): Promise<CreateResult> {
     .single();
 
   if (insertError) {
+    log("insert failed", { msg: insertError.message, code: insertError.code });
     // 업로드된 이미지 정리
     await supabase.storage.from("posts").remove([path]);
-    return { error: `저장 실패: ${insertError.message}` };
+    // 흔한 원인: profile 없음 (FK violation) 또는 hidden_by_reports 컬럼 없음 (002 미적용)
+    const hint = /profiles/i.test(insertError.message)
+      ? " — profile이 없습니다. /onboarding 먼저 완료하세요."
+      : /hidden_by_reports|report_count/i.test(insertError.message)
+      ? " — 002_moderation.sql 미적용. supabase/_full_setup.sql 실행 필요."
+      : "";
+    return { error: `저장 실패: ${insertError.message}${hint}` };
   }
+  log("insert ok", { postId: inserted.id });
 
   revalidatePath("/feed");
   revalidatePath(`/profile/me`);

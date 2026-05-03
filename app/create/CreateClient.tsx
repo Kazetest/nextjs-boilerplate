@@ -37,11 +37,41 @@ export default function CreateClient() {
       fd.append("originCreator", origin.creatorUsername);
     if (origin.label) fd.append("originLabel", origin.label);
 
-    const result = await createPost(fd);
+    // 25초 이상 응답 없으면 사용자에게 진단 메시지 (Vercel timeout이 보통 그 안에 떨어짐)
+    const slowWarn = setTimeout(() => {
+      setError(
+        "응답이 없어요. /debug 페이지에서 테이블 ✓ 여부 확인하거나 Vercel Functions 로그 봐주세요."
+      );
+    }, 25000);
 
-    if (result?.error) {
-      setError(result.error);
+    try {
+      console.log("[NOai] createPost: submit start", {
+        imageSize: imageFile.size,
+        captionLen: caption.length,
+      });
+      const result = await createPost(fd);
+      console.log("[NOai] createPost: result", result);
+
+      if (result?.error) {
+        setError(result.error);
+        setSubmitting(false);
+      }
+      // 성공 시 redirect 발생 — 이 코드 도달 안 함
+    } catch (e: unknown) {
+      // Next.js redirect는 NEXT_REDIRECT throw — 그대로 전파해야 navigate 됨
+      const digest = (e as { digest?: string })?.digest;
+      if (typeof digest === "string" && digest.startsWith("NEXT_REDIRECT")) {
+        throw e;
+      }
+      console.error("[NOai] createPost threw:", e);
+      setError(
+        e instanceof Error
+          ? `게시 실패: ${e.message}`
+          : "게시 실패 (서버 에러). /debug 확인."
+      );
       setSubmitting(false);
+    } finally {
+      clearTimeout(slowWarn);
     }
   }
 
