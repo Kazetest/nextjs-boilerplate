@@ -39,7 +39,6 @@ export default async function FeedPage() {
 
   return (
     <div className="relative z-10 flex flex-col flex-1 w-full">
-      <Header />
       <main className="max-w-xl mx-auto px-4 py-6 w-full">
         {rows.length === 0 ? (
           <div className="text-center py-20 text-ink-soft">
@@ -64,37 +63,3 @@ export default async function FeedPage() {
   );
 }
 
-function Header() {
-  return (
-    <header className="sticky top-0 z-20 bg-bg/80 backdrop-blur border-b border-line">
-      <div className="max-w-xl mx-auto px-4 h-14 flex items-center justify-between">
-        <Link href="/feed" className="font-serif text-xl tracking-tight">
-          NOai
-        </Link>
-        <nav className="flex items-center gap-5 text-sm font-serif">
-          <Link href="/feed" className="text-ink">
-            피드
-          </Link>
-          <Link
-            href="/explore"
-            className="text-ink-soft hover:text-ink transition-colors"
-          >
-            탐색
-          </Link>
-          <Link
-            href="/create"
-            className="text-ink-soft hover:text-ink transition-colors"
-          >
-            + 새 글
-          </Link>
-          <Link
-            href="/profile/me"
-            className="text-ink-soft hover:text-ink transition-colors"
-          >
-            나
-          </Link>
-        </nav>
-      </div>
-    </header>
-  );
-}

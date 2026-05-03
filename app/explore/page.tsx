@@ -42,8 +42,6 @@ export default async function ExplorePage() {
 
   return (
     <div className="relative z-10 flex flex-col flex-1 w-full">
-      <Header />
-
       <main className="max-w-2xl mx-auto px-4 py-8 w-full">
         <div className="mb-8">
           <h1 className="font-serif text-3xl mb-2">탐색</h1>
@@ -79,37 +77,3 @@ export default async function ExplorePage() {
   );
 }
 
-function Header() {
-  return (
-    <header className="sticky top-0 z-20 bg-bg/80 backdrop-blur border-b border-line">
-      <div className="max-w-2xl mx-auto px-4 h-14 flex items-center justify-between">
-        <Link href="/feed" className="font-serif text-xl tracking-tight">
-          NOai
-        </Link>
-        <nav className="flex items-center gap-6 text-sm font-serif">
-          <Link
-            href="/feed"
-            className="text-ink-soft hover:text-ink transition-colors"
-          >
-            피드
-          </Link>
-          <Link href="/explore" className="text-ink">
-            탐색
-          </Link>
-          <Link
-            href="/create"
-            className="text-ink-soft hover:text-ink transition-colors"
-          >
-            + 새 글
-          </Link>
-          <Link
-            href="/profile/me"
-            className="text-ink-soft hover:text-ink transition-colors"
-          >
-            나
-          </Link>
-        </nav>
-      </div>
-    </header>
-  );
-}
