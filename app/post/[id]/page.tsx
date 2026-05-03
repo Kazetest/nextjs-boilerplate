@@ -6,6 +6,7 @@ import { AuthenticityCard } from "@/components/AuthenticityCard";
 import { KeystrokeReplay } from "@/components/KeystrokeReplay";
 import { ReactionButton } from "@/components/ReactionButton";
 import { CommentSection } from "@/components/CommentSection";
+import { ShareButton } from "@/components/ShareButton";
 import type { KeystrokeRecord } from "@/lib/keystroke";
 
 export const dynamic = "force-dynamic";
@@ -80,15 +81,22 @@ export default async function PostPage({
       <main className="max-w-xl mx-auto px-4 py-6 w-full space-y-8">
         <PostCard post={post as unknown as PostRow} currentUserId={user.id} />
 
-        <div className="flex items-center gap-6 px-4">
-          <ReactionButton
-            postId={id}
-            initialReacted={!!myReaction}
-            initialCount={reactionCount ?? 0}
+        <div className="flex items-center justify-between gap-4 px-4">
+          <div className="flex items-center gap-6">
+            <ReactionButton
+              postId={id}
+              initialReacted={!!myReaction}
+              initialCount={reactionCount ?? 0}
+            />
+            <span className="text-sm text-ink-faint font-serif">
+              댓글 {comments?.length ?? 0}
+            </span>
+          </div>
+          <ShareButton
+            url={`/post/${id}`}
+            title={`@${post.author?.username ?? "noai"} on NOai`}
+            text={post.caption.slice(0, 100)}
           />
-          <span className="text-sm text-ink-faint font-serif">
-            댓글 {comments?.length ?? 0}
-          </span>
         </div>
 
         <AuthenticityCard post={post as unknown as PostRow} />
