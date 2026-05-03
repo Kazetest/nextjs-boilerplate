@@ -33,6 +33,7 @@ export default async function PostPage({
     .maybeSingle();
 
   if (!post) notFound();
+  const postRow = post as unknown as PostRow;
 
   const { count: reactionCount } = await supabase
     .from("reactions")
@@ -94,8 +95,8 @@ export default async function PostPage({
           </div>
           <ShareButton
             url={`/post/${id}`}
-            title={`@${post.author?.username ?? "noai"} on NOai`}
-            text={post.caption.slice(0, 100)}
+            title={`@${postRow.author?.username ?? "noai"} on NOai`}
+            text={postRow.caption.slice(0, 100)}
           />
         </div>
 
