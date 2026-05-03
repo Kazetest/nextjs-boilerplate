@@ -137,16 +137,66 @@ async function simulatePublish(
     });
   }
 
-  // 4. SightEngine env (활성 시 응답 시간 한도가 Vercel timeout과 충돌하기 쉬움)
-  const seActive =
-    !!process.env.SIGHTENGINE_API_USER && !!process.env.SIGHTENGINE_API_SECRET;
-  results.push({
-    stage: "SightEngine env",
-    ok: true,
-    detail: seActive
-      ? "활성 — 8s timeout. Vercel Hobby(10s)면 upload+insert와 합산 risk"
-      : "비활성 — AI 이미지 검사 스킵 (게시 stuck 원인 후보 제거)",
-  });
+  // 4. SightEngine ping (활성이면 실제 호출, 응답 시간 측정 — stuck 원인 후보 검증)
+  const seUser = process.env.SIGHTENGINE_API_USER;
+  const seSecret = process.env.SIGHTENGINE_API_SECRET;
+  if (!seUser || !seSecret) {
+    results.push({
+      stage: "SightEngine env",
+      ok: true,
+      detail: "비활성 — AI 이미지 검사 스킵 (이게 stuck 원인은 아님)",
+    });
+  } else {
+    const t0 = Date.now();
+    try {
+      // 1x1 PNG (66바이트 base64) — 실제 호출로 응답 시간 측정
+      const tinyPng = Uint8Array.from(
+        atob(
+          "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
+        ),
+        (c) => c.charCodeAt(0)
+      );
+      const fd = new FormData();
+      fd.append("media", new Blob([tinyPng], { type: "image/png" }), "p.png");
+      fd.append("models", "genai");
+      fd.append("api_user", seUser);
+      fd.append("api_secret", seSecret);
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 8000);
+      const res = await fetch("https://api.sightengine.com/1.0/check.json", {
+        method: "POST",
+        body: fd,
+        signal: ctrl.signal,
+      }).finally(() => clearTimeout(timer));
+      const ms = Date.now() - t0;
+      if (!res.ok) {
+        results.push({
+          stage: "SightEngine ping",
+          ok: false,
+          detail: `${res.status} ${res.statusText} (${ms}ms)`,
+          hint: "API 키 무효 또는 quota 초과. createPost는 timeout 후 silent skip하므로 stuck 원인은 아님",
+        });
+      } else {
+        results.push({
+          stage: "SightEngine ping",
+          ok: true,
+          detail: `${ms}ms — Vercel Hobby 10s면 upload+insert와 합산 ${ms > 4000 ? "risk" : "OK"}`,
+        });
+      }
+    } catch (e) {
+      const ms = Date.now() - t0;
+      const msg = e instanceof Error ? e.message : "unknown";
+      results.push({
+        stage: "SightEngine ping",
+        ok: false,
+        detail: `${msg} (${ms}ms)`,
+        hint:
+          ms >= 7900
+            ? "8s timeout — SightEngine이 hang. 비활성 권장 (env 제거 또는 키 교체)"
+            : "외부 API 도달 실패",
+      });
+    }
+  }
 
   return results;
 }
