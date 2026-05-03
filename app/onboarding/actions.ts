@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 
 export type OnboardingResult = { error?: string; ok?: boolean };
 
@@ -76,5 +77,6 @@ export async function saveOnboarding({
     .eq("id", user.id);
 
   if (error) return { error: error.message };
-  return { ok: true };
+
+  redirect("/feed");
 }

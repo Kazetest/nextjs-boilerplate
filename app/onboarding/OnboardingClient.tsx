@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { saveOnboarding } from "./actions";
 
 export function OnboardingClient({
@@ -11,7 +10,6 @@ export function OnboardingClient({
   currentUsername: string;
   email: string;
 }) {
-  const router = useRouter();
   const [username, setUsername] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [bio, setBio] = useState("");
@@ -29,12 +27,9 @@ export function OnboardingClient({
       bio: bio.trim(),
     });
 
-    if (r.error) {
+    if (r?.error) {
       setError(r.error);
       setSubmitting(false);
-    } else {
-      router.push("/feed");
-      router.refresh();
     }
   }
 
