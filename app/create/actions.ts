@@ -4,9 +4,9 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-// Vercel function timeout — Hobby는 10초가 강제 상한. Pro에서만 늘어남.
-// 10초 안에 끝내려면 SightEngine 호출은 짧아야 함.
-export const maxDuration = 60;
+// Vercel function timeout: Hobby는 10s 강제 상한, Pro에서 늘어남.
+// 'use server' 파일은 type/const export 금지 — async function 외 export하면 모듈 전체 깨짐.
+// maxDuration은 route segment 단에서만 설정 가능 (이 파일 X).
 
 export type CreateResult = { error?: string; postId?: string };
 
