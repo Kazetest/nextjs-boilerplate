@@ -21,6 +21,24 @@ import type { KeystrokeRecord } from "@/lib/keystroke";
 
 const MAX_STORY_IMAGE_BYTES = 8 * 1024 * 1024;
 
+type StoryUploadResponse = {
+  ok?: boolean;
+  error?: string;
+  redirectTo?: string;
+  stage?: string;
+  code?: string;
+  hint?: string;
+  raw?: string;
+};
+
+type UploadErrorDetail = {
+  status?: number;
+  stage?: string;
+  code?: string;
+  hint?: string;
+  raw?: string;
+};
+
 export function StoryCreateClient() {
   const router = useRouter();
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -32,6 +50,9 @@ export function StoryCreateClient() {
   const [submitStatus, setSubmitStatus] = useState<string | null>(null);
   const [uploadLog, setUploadLog] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [errorDetail, setErrorDetail] = useState<UploadErrorDetail | null>(
+    null
+  );
   const captionReady = isStoryCaptionReady(caption, keystrokes);
   const canSubmit = !!imageFile && !submitting;
 
@@ -49,16 +70,27 @@ export function StoryCreateClient() {
     if (submitting) return;
     if (!imageFile) {
       setError("사진을 먼저 선택해주세요.");
+      setErrorDetail({
+        stage: "client.image",
+        code: "IMAGE_REQUIRED",
+        hint: "카메라 버튼으로 스토리 이미지를 먼저 선택해주세요.",
+      });
       addUploadLog("사진 없음: 업로드 중단");
       return;
     }
     if (!captionReady) {
       setError("캡션은 직접 타이핑 흔적이 필요합니다. 한 글자만 더 입력하거나 캡션을 비워주세요.");
+      setErrorDetail({
+        stage: "client.keystrokes",
+        code: "KEYSTROKES_NOT_READY",
+        hint: "캡션 입력칸에 직접 타이핑한 흔적이 충분해야 합니다.",
+      });
       addUploadLog("캡션 직타 검증 미완료");
       return;
     }
     setSubmitting(true);
     setError(null);
+    setErrorDetail(null);
     setSubmitStatus("스토리를 서버에 업로드 중...");
     addUploadLog("서버 업로드 시작");
 
@@ -69,18 +101,29 @@ export function StoryCreateClient() {
     fd.append("exif", JSON.stringify(exif?.data ?? {}));
 
     try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 25000);
       const res = await fetch("/api/stories/create", {
         method: "POST",
         body: fd,
-      });
+        signal: controller.signal,
+      }).finally(() => clearTimeout(timer));
       addUploadLog(`서버 응답 수신: HTTP ${res.status}`);
-      const result = (await res.json()) as {
-        error?: string;
-        redirectTo?: string;
-      };
+      const result = await readStoryUploadResponse(res);
       if (!res.ok || result.error) {
         setError(result.error ?? `스토리 업로드 실패 (HTTP ${res.status})`);
-        addUploadLog("업로드 실패: 화면에 에러 표시");
+        setErrorDetail({
+          status: res.status,
+          stage: result.stage,
+          code: result.code,
+          hint: result.hint,
+          raw: result.raw,
+        });
+        addUploadLog(
+          `업로드 실패: ${result.stage ?? "unknown"}${
+            result.code ? `/${result.code}` : ""
+          }`
+        );
         setSubmitStatus(null);
         setSubmitting(false);
         return;
@@ -90,8 +133,22 @@ export function StoryCreateClient() {
       router.push(result.redirectTo ?? "/story/me");
       router.refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "스토리 업로드 실패");
-      addUploadLog("네트워크/브라우저 예외 발생");
+      const aborted = e instanceof DOMException && e.name === "AbortError";
+      setError(
+        aborted
+          ? "서버 응답이 25초 넘게 지연됐습니다."
+          : e instanceof Error
+          ? e.message
+          : "스토리 업로드 실패"
+      );
+      setErrorDetail({
+        stage: aborted ? "network.timeout" : "network.fetch",
+        code: aborted ? "REQUEST_TIMEOUT" : "REQUEST_FAILED",
+        hint: aborted
+          ? "이미지가 크거나 Vercel 함수가 오래 걸렸습니다. 다시 시도 전 /debug 시뮬레이션을 확인해주세요."
+          : "네트워크 또는 서버 응답이 끊겼습니다. 새로고침 후 다시 시도해주세요.",
+      });
+      addUploadLog(aborted ? "요청 타임아웃" : "네트워크/브라우저 예외 발생");
       setSubmitStatus(null);
       setSubmitting(false);
     }
@@ -153,6 +210,11 @@ export function StoryCreateClient() {
                     optimized.size
                   )}). 8MB 이하 JPG/PNG/WebP로 올려주세요.`
                 );
+                setErrorDetail({
+                  stage: "client.image",
+                  code: "IMAGE_TOO_LARGE",
+                  hint: "스토리는 업로드 전에 8MB를 넘으면 서버 호출을 막습니다.",
+                });
                 setImageNote("이미지 최적화 후에도 8MB를 넘어서 업로드를 막았습니다.");
                 addUploadLog("이미지 용량 초과: 업로드 차단");
                 return;
@@ -174,6 +236,7 @@ export function StoryCreateClient() {
               setSubmitStatus(null);
               setUploadLog([]);
               setError(null);
+              setErrorDetail(null);
             }}
           />
         </div>
@@ -204,6 +267,19 @@ export function StoryCreateClient() {
       {error && (
         <div className="mt-4 rounded-lg border border-warn/40 bg-warn/5 px-4 py-3 font-serif text-sm leading-relaxed text-warn">
           <p>{error}</p>
+          {errorDetail && (
+            <div className="mt-3 space-y-1.5 border-t border-warn/20 pt-3 font-sans text-[11px] text-warn/90">
+              <ErrorMeta label="status" value={errorDetail.status} />
+              <ErrorMeta label="stage" value={errorDetail.stage} />
+              <ErrorMeta label="code" value={errorDetail.code} />
+              {errorDetail.hint && <p className="font-serif">{errorDetail.hint}</p>}
+              {errorDetail.raw && (
+                <p className="break-all font-serif text-warn/80">
+                  응답 일부: {errorDetail.raw}
+                </p>
+              )}
+            </div>
+          )}
           <Link
             href="/debug"
             className="mt-2 inline-flex text-xs text-warn underline underline-offset-4"
@@ -242,6 +318,49 @@ export function StoryCreateClient() {
         {submitting ? "업로드 중" : imageFile ? "스토리 올리기" : "사진 선택 후 올리기"}
       </button>
     </main>
+  );
+}
+
+async function readStoryUploadResponse(
+  res: Response
+): Promise<StoryUploadResponse> {
+  const contentType = res.headers.get("content-type") ?? "";
+  if (contentType.includes("application/json")) {
+    try {
+      return (await res.json()) as StoryUploadResponse;
+    } catch {
+      return {
+        error: `스토리 업로드 실패 (HTTP ${res.status})`,
+        stage: "response.parse",
+        code: "JSON_PARSE_FAILED",
+        hint: "서버가 잘못된 JSON을 반환했습니다.",
+      };
+    }
+  }
+
+  const text = await res.text().catch(() => "");
+  return {
+    error: `스토리 업로드 실패 (HTTP ${res.status})`,
+    stage: "response.non_json",
+    code: "NON_JSON_RESPONSE",
+    hint: "Vercel/Next가 HTML 오류 페이지를 반환했을 수 있습니다.",
+    raw: text.replace(/\s+/g, " ").slice(0, 220),
+  };
+}
+
+function ErrorMeta({
+  label,
+  value,
+}: {
+  label: string;
+  value?: string | number;
+}) {
+  if (value === undefined || value === null || value === "") return null;
+  return (
+    <p>
+      <span className="uppercase tracking-[0.18em] text-warn/60">{label}</span>{" "}
+      <span className="font-mono">{value}</span>
+    </p>
   );
 }
 
