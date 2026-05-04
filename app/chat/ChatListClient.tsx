@@ -102,10 +102,11 @@ export function ChatListClient({
         </label>
         <button
           type="submit"
-          className="grid h-10 w-10 place-items-center bg-ink text-bg transition-colors hover:bg-ink-soft"
+          className="inline-flex h-10 items-center gap-2 bg-ink px-4 font-sans text-sm text-bg transition-colors hover:bg-ink-soft"
           aria-label="대화 시작"
         >
           <Send size={16} />
+          열기
         </button>
       </form>
 
