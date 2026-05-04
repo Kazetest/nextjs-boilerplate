@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Bookmark, Camera } from "lucide-react";
+import { Bookmark, Camera, HeartHandshake, MessageCircle } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +16,8 @@ type SavedPost = {
   caption: string;
   created_at: string;
   author: { username: string } | null;
+  reaction_count?: number;
+  comment_count?: number;
 };
 
 export default async function SavedPage() {
@@ -46,10 +48,46 @@ export default async function SavedPage() {
           .eq("hidden_by_reports", false)
       : { data: [] };
 
-  const byId = new Map(((posts ?? []) as unknown as SavedPost[]).map((p) => [p.id, p]));
+  const postRows = (posts ?? []) as unknown as SavedPost[];
+  const visibleIds = postRows.map((post) => post.id);
+  const [{ data: reactionRows }, { data: commentRows }] =
+    visibleIds.length > 0
+      ? await Promise.all([
+          supabase.from("reactions").select("post_id").in("post_id", visibleIds),
+          supabase.from("comments").select("post_id").in("post_id", visibleIds),
+        ])
+      : [{ data: [] }, { data: [] }];
+  const reactionCountByPost = new Map<string, number>();
+  const commentCountByPost = new Map<string, number>();
+  for (const reaction of reactionRows ?? []) {
+    reactionCountByPost.set(
+      reaction.post_id,
+      (reactionCountByPost.get(reaction.post_id) ?? 0) + 1
+    );
+  }
+  for (const comment of commentRows ?? []) {
+    commentCountByPost.set(
+      comment.post_id,
+      (commentCountByPost.get(comment.post_id) ?? 0) + 1
+    );
+  }
+  const decoratedPosts: SavedPost[] = postRows.map((post) => ({
+    ...post,
+    reaction_count: reactionCountByPost.get(post.id) ?? 0,
+    comment_count: commentCountByPost.get(post.id) ?? 0,
+  }));
+  const byId = new Map(decoratedPosts.map((p) => [p.id, p]));
   const rows = savedRows
     .map((savedPost) => byId.get(savedPost.post_id))
     .filter((post): post is SavedPost => !!post);
+  const totalReactions = rows.reduce(
+    (sum, post) => sum + (post.reaction_count ?? 0),
+    0
+  );
+  const totalComments = rows.reduce(
+    (sum, post) => sum + (post.comment_count ?? 0),
+    0
+  );
 
   return (
     <main className="relative z-10 mx-auto w-full max-w-3xl px-4 py-7">
@@ -73,6 +111,20 @@ export default async function SavedPage() {
           saved_posts 테이블이 필요합니다. _full_setup.sql 또는 008_saved_posts.sql을 적용해주세요.
         </div>
       )}
+
+      <section className="mb-5 grid grid-cols-3 border border-line bg-bg-card">
+        <SavedStat icon={<Bookmark size={15} />} label="저장" value={rows.length} />
+        <SavedStat
+          icon={<HeartHandshake size={15} />}
+          label="묵례"
+          value={totalReactions}
+        />
+        <SavedStat
+          icon={<MessageCircle size={15} />}
+          label="댓글"
+          value={totalComments}
+        />
+      </section>
 
       {rows.length === 0 ? (
         <div className="border border-line bg-bg-card px-6 py-16 text-center">
@@ -104,15 +156,47 @@ export default async function SavedPage() {
                 alt={post.caption.slice(0, 40)}
                 className="h-full w-full object-cover"
               />
-              <div className="absolute inset-x-0 bottom-0 hidden bg-gradient-to-t from-black/55 to-transparent p-2 text-white group-hover:block">
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/65 to-transparent p-2 text-white opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
                 <p className="truncate font-sans text-[11px]">
                   @{post.author?.username ?? "unknown"}
                 </p>
+                <div className="mt-1 flex items-center gap-2 font-sans text-[11px] text-white/85">
+                  <span className="inline-flex items-center gap-1">
+                    <HeartHandshake size={12} />
+                    {post.reaction_count ?? 0}
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <MessageCircle size={12} />
+                    {post.comment_count ?? 0}
+                  </span>
+                </div>
               </div>
             </Link>
           ))}
         </div>
       )}
     </main>
+  );
+}
+
+function SavedStat({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: number;
+}) {
+  return (
+    <div className="flex min-w-0 flex-col gap-1 border-r border-line px-3 py-2 last:border-r-0">
+      <span className="flex items-center gap-1 font-sans text-[11px] text-ink-faint">
+        {icon}
+        {label}
+      </span>
+      <span className="font-sans text-sm font-medium text-ink tabular-nums">
+        {value}
+      </span>
+    </div>
   );
 }
