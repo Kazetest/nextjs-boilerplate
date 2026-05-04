@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import {
+  ArrowUpRight,
   AtSign,
   Bell,
   Eye,
@@ -277,7 +278,7 @@ function ActivityStat({
 function NotifLink({ n }: { n: Row }) {
   const username = n.actor?.username ?? "탈퇴한 사용자";
   const text = textFor(n.kind, username);
-  const href = hrefFor(n);
+  const actionLabel = actionFor(n.kind);
 
   const inner = (
     <div className="flex items-center gap-3 px-3 py-3">
@@ -292,17 +293,32 @@ function NotifLink({ n }: { n: Row }) {
         </span>
       </div>
       <div className="min-w-0 flex-1">
+        <div className="mb-1 flex flex-wrap items-center gap-2">
+          <span className="font-sans text-[10px] uppercase tracking-[0.18em] text-ink-faint">
+            {kindLabel(n.kind)}
+          </span>
+          {!n.read && (
+            <span className="border border-ink bg-ink px-1.5 py-0.5 font-sans text-[10px] text-bg">
+              새 알림
+            </span>
+          )}
+        </div>
         <p className="font-serif text-sm leading-relaxed text-ink">{text}</p>
-        <time className="font-sans text-[11px] text-ink-faint">
-          {relative(n.created_at)}
-        </time>
+        <div className="mt-1 flex flex-wrap items-center gap-2">
+          <time className="font-sans text-[11px] text-ink-faint">
+            {relative(n.created_at)}
+          </time>
+          <span className="inline-flex items-center gap-1 font-sans text-[11px] text-ink-soft">
+            {actionLabel}
+            <ArrowUpRight size={12} />
+          </span>
+        </div>
       </div>
       {!n.read && <span className="h-2 w-2 rounded-full bg-ink" />}
     </div>
   );
 
-  if (!href) return inner;
-  return <Link href={href}>{inner}</Link>;
+  return <Link href={`/notifications/open/${n.id}`}>{inner}</Link>;
 }
 
 function NotifIcon({ kind }: { kind: Row["kind"] }) {
@@ -331,16 +347,28 @@ function textFor(kind: Row["kind"], username: string): string {
   }
 }
 
-function hrefFor(n: Row): string | null {
-  if (!n.actor) return null;
-  switch (n.kind) {
+function kindLabel(kind: Row["kind"]): string {
+  switch (kind) {
+    case "bow":
+      return "Bow";
+    case "comment":
+      return "Comment";
+    case "follow":
+      return "Follow";
+    case "message":
+      return "Direct";
+  }
+}
+
+function actionFor(kind: Row["kind"]): string {
+  switch (kind) {
     case "bow":
     case "comment":
-      return n.post_id ? `/post/${n.post_id}` : null;
+      return "게시물 보기";
     case "follow":
-      return `/profile/${n.actor.username}`;
+      return "프로필 보기";
     case "message":
-      return `/chat/${n.actor.username}`;
+      return "대화 열기";
   }
 }
 

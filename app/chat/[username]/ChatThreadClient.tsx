@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { CheckCheck, Send, ShieldCheck } from "lucide-react";
+import Link from "next/link";
+import { CheckCheck, Send, ShieldCheck, UserRound } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { HumanAvatar } from "@/components/HumanAvatar";
 import { sendMessage } from "../actions";
@@ -14,7 +15,12 @@ type Msg = {
   read: boolean;
 };
 
-const QUICK_REPLIES = ["묵례 보냅니다", "직접 찍은 느낌 좋아요", "방금 봤어요"];
+const QUICK_REPLIES = [
+  "묵례 보냅니다",
+  "직접 찍은 느낌 좋아요",
+  "어디서 찍었어요?",
+  "원작 링크 있어요?",
+];
 
 export function ChatThreadClient({
   meId,
@@ -103,7 +109,7 @@ export function ChatThreadClient({
       read: false,
     };
     setMessages((prev) => [...prev, optimistic]);
-    const sentBody = body;
+    const sentBody = body.trim();
     setBody("");
 
     const r = await sendMessage({
@@ -117,6 +123,13 @@ export function ChatThreadClient({
       setBody(sentBody);
     }
     setSending(false);
+  }
+
+  function applyQuickReply(reply: string) {
+    setBody((prev) => {
+      const trimmed = prev.trim();
+      return trimmed ? `${trimmed} ${reply}` : reply;
+    });
   }
 
   return (
@@ -135,6 +148,13 @@ export function ChatThreadClient({
             <p className="mt-2 font-serif text-sm leading-relaxed text-ink-soft">
               NOai의 대화는 관계를 만들기 위한 공간입니다.
             </p>
+            <Link
+              href={`/profile/${otherUsername}`}
+              className="mt-5 inline-flex h-9 items-center gap-2 border border-line bg-bg px-3 font-sans text-xs text-ink-soft transition-colors hover:border-ink hover:text-ink"
+            >
+              <UserRound size={14} />
+              프로필 보기
+            </Link>
           </div>
         ) : (
           messages.map((m, index) => {
@@ -208,12 +228,21 @@ export function ChatThreadClient({
         onSubmit={handleSend}
         className="sticky bottom-0 border-t border-line bg-bg/95 px-3 py-3 backdrop-blur"
       >
+        {error && (
+          <p className="mb-2 text-center font-serif text-xs text-warn">
+            {error}
+          </p>
+        )}
+        <div className="mb-2 flex items-center justify-between gap-3 font-sans text-[11px] text-ink-faint">
+          <span className="truncate">@{otherUsername}</span>
+          <span className="tabular-nums">{body.length}/1000</span>
+        </div>
         <div className="mb-2 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {QUICK_REPLIES.map((reply) => (
             <button
               key={reply}
               type="button"
-              onClick={() => setBody(reply)}
+              onClick={() => applyQuickReply(reply)}
               disabled={sending}
               className="shrink-0 rounded-full border border-line bg-bg-card px-3 py-1.5 font-sans text-xs text-ink-soft transition-colors hover:border-ink hover:text-ink disabled:opacity-50"
             >
@@ -222,13 +251,13 @@ export function ChatThreadClient({
           ))}
         </div>
         <div className="grid grid-cols-[1fr_auto] gap-2">
-          <input
-            type="text"
+          <textarea
             value={body}
             onChange={(e) => setBody(e.target.value)}
             placeholder="메시지 입력 (직접 타이핑하세요)"
             maxLength={1000}
-            className="min-w-0 border border-line bg-bg-card px-3 py-2 font-serif text-sm outline-none transition-colors focus:border-ink"
+            rows={1}
+            className="max-h-28 min-h-10 min-w-0 resize-none border border-line bg-bg-card px-3 py-2 font-serif text-sm outline-none transition-colors focus:border-ink"
             disabled={sending}
           />
           <button
@@ -241,12 +270,6 @@ export function ChatThreadClient({
           </button>
         </div>
       </form>
-
-      {error && (
-        <p className="text-xs text-warn text-center pb-2 font-serif">
-          {error}
-        </p>
-      )}
     </>
   );
 }
