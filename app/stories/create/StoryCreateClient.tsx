@@ -29,6 +29,7 @@ export function StoryCreateClient() {
   const [caption, setCaption] = useState("");
   const [keystrokes, setKeystrokes] = useState<KeystrokeRecord | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [submitStatus, setSubmitStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const captionReady = isStoryCaptionReady(caption, keystrokes);
   const canSubmit = !!imageFile && !submitting;
@@ -45,6 +46,7 @@ export function StoryCreateClient() {
     }
     setSubmitting(true);
     setError(null);
+    setSubmitStatus("스토리를 서버에 업로드 중...");
 
     const fd = new FormData();
     fd.append("image", imageFile);
@@ -63,13 +65,16 @@ export function StoryCreateClient() {
       };
       if (!res.ok || result.error) {
         setError(result.error ?? `스토리 업로드 실패 (HTTP ${res.status})`);
+        setSubmitStatus(null);
         setSubmitting(false);
         return;
       }
+      setSubmitStatus("스토리 저장 완료. 화면 이동 중...");
       router.push(result.redirectTo ?? "/story/me");
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "스토리 업로드 실패");
+      setSubmitStatus(null);
       setSubmitting(false);
     }
   }
@@ -145,6 +150,7 @@ export function StoryCreateClient() {
               setImageFile(null);
               setExif(null);
               setImageNote(null);
+              setSubmitStatus(null);
               setError(null);
             }}
           />
@@ -179,6 +185,12 @@ export function StoryCreateClient() {
         </div>
       )}
 
+      {submitStatus && !error && (
+        <div className="mt-4 rounded-lg border border-line bg-bg-card px-4 py-3 font-serif text-sm text-ink-soft">
+          {submitStatus}
+        </div>
+      )}
+
       <button
         type="button"
         onClick={handleSubmit}
@@ -186,7 +198,7 @@ export function StoryCreateClient() {
         className="mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-ink px-5 font-sans text-sm text-bg transition-colors hover:bg-ink-soft disabled:opacity-35"
       >
         <Send size={17} />
-        {submitting ? "올리는 중" : imageFile ? "스토리 올리기" : "사진 선택 후 올리기"}
+        {submitting ? "업로드 중" : imageFile ? "스토리 올리기" : "사진 선택 후 올리기"}
       </button>
     </main>
   );
