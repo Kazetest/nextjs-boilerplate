@@ -14,6 +14,35 @@ export async function createStory(formData: FormData): Promise<StoryResult> {
 
   if (!user) return { error: "로그인이 필요합니다" };
 
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (profileError) {
+    const hint = /schema cache|relation|profiles/i.test(profileError.message)
+      ? " — profiles 테이블 확인 필요. supabase/_full_setup.sql 적용 필요."
+      : "";
+    return { error: `프로필 확인 실패: ${profileError.message}${hint}` };
+  }
+
+  if (!profile) {
+    const fallbackUsername = `user_${user.id.slice(0, 8)}`;
+    const { error: createProfileError } = await supabase
+      .from("profiles")
+      .insert({ id: user.id, username: fallbackUsername });
+
+    if (createProfileError) {
+      const hint = /row-level security|violates/i.test(createProfileError.message)
+        ? " — profiles RLS 정책 확인 필요. supabase/_full_setup.sql 적용 필요."
+        : "";
+      return {
+        error: `프로필 자동 생성 실패: ${createProfileError.message}${hint}`,
+      };
+    }
+  }
+
   const image = formData.get("image") as File | null;
   const caption = ((formData.get("caption") as string) ?? "").trim();
   const keystrokesRaw = (formData.get("keystrokes") as string) ?? "";
@@ -31,10 +60,10 @@ export async function createStory(formData: FormData): Promise<StoryResult> {
       if (!keystrokes?.strokes || !Array.isArray(keystrokes.strokes)) {
         return { error: "타이핑 데이터가 없습니다" };
       }
-      if (keystrokes.strokes.length < Math.max(2, caption.length * 0.35)) {
+      if (keystrokes.strokes.length < Math.max(1, Math.ceil(caption.length * 0.2))) {
         return { error: "타이핑 흔적이 부족합니다" };
       }
-      if (keystrokes.durationMs < caption.length * 18) {
+      if (caption.length >= 20 && keystrokes.durationMs < caption.length * 8) {
         return { error: "타이핑이 너무 빠릅니다" };
       }
     } catch {
@@ -73,6 +102,8 @@ export async function createStory(formData: FormData): Promise<StoryResult> {
   if (uploadError) {
     const hint = /bucket/i.test(uploadError.message)
       ? " — Supabase에 'stories' 버킷이 없습니다. supabase/_full_setup.sql 적용 필요."
+      : /row-level security|violates/i.test(uploadError.message)
+      ? " — stories storage RLS 정책이 없습니다. supabase/_full_setup.sql 적용 필요."
       : "";
     return { error: `업로드 실패: ${uploadError.message}${hint}` };
   }
@@ -96,8 +127,10 @@ export async function createStory(formData: FormData): Promise<StoryResult> {
 
   if (insertError) {
     await supabase.storage.from("stories").remove([path]);
-    const hint = /stories|story_views/i.test(insertError.message)
+    const hint = /stories|story_views|schema cache|relation|column/i.test(insertError.message)
       ? " — 005_stories.sql 또는 _full_setup.sql 적용 필요."
+      : /row-level security|violates/i.test(insertError.message)
+      ? " — stories RLS 정책이 없습니다. supabase/_full_setup.sql 적용 필요."
       : "";
     return { error: `저장 실패: ${insertError.message}${hint}` };
   }

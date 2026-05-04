@@ -27,10 +27,18 @@ export function StoryCreateClient() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const captionReady = isStoryCaptionReady(caption, keystrokes);
-  const canSubmit = !!imageFile && captionReady && !submitting;
+  const canSubmit = !!imageFile && !submitting;
 
   async function handleSubmit() {
-    if (!imageFile || !captionReady || submitting) return;
+    if (submitting) return;
+    if (!imageFile) {
+      setError("사진을 먼저 선택해주세요.");
+      return;
+    }
+    if (!captionReady) {
+      setError("캡션은 직접 타이핑 흔적이 필요합니다. 한 글자만 더 입력하거나 캡션을 비워주세요.");
+      return;
+    }
     setSubmitting(true);
     setError(null);
 
@@ -116,6 +124,11 @@ export function StoryCreateClient() {
           minHeight="min-h-24"
           placeholder="짧게 직접 써주세요."
         />
+        {caption.trim() && !captionReady && (
+          <p className="mt-2 font-serif text-xs text-warn">
+            직접 입력 흔적이 아직 부족합니다. 한 글자만 더 입력하거나 캡션 없이 올릴 수 있어요.
+          </p>
+        )}
       </div>
 
       {error && (
@@ -123,6 +136,16 @@ export function StoryCreateClient() {
           {error}
         </div>
       )}
+
+      <button
+        type="button"
+        onClick={handleSubmit}
+        disabled={!canSubmit}
+        className="mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-ink px-5 font-sans text-sm text-bg transition-colors hover:bg-ink-soft disabled:opacity-35"
+      >
+        <Send size={17} />
+        {submitting ? "올리는 중" : imageFile ? "스토리 올리기" : "사진 선택 후 올리기"}
+      </button>
     </main>
   );
 }
@@ -243,7 +266,6 @@ function isStoryCaptionReady(
   if (!trimmed) return true;
   return (
     !!keystrokes &&
-    keystrokes.strokes.length >= Math.max(2, trimmed.length * 0.35) &&
-    keystrokes.durationMs >= trimmed.length * 18
+    keystrokes.strokes.length >= Math.max(1, Math.ceil(trimmed.length * 0.2))
   );
 }
