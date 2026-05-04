@@ -30,23 +30,37 @@ export function StoryCreateClient() {
   const [keystrokes, setKeystrokes] = useState<KeystrokeRecord | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<string | null>(null);
+  const [uploadLog, setUploadLog] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const captionReady = isStoryCaptionReady(caption, keystrokes);
   const canSubmit = !!imageFile && !submitting;
+
+  function addUploadLog(message: string) {
+    const time = new Intl.DateTimeFormat("ko-KR", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    }).format(new Date());
+    setUploadLog((prev) => [`${time} · ${message}`, ...prev].slice(0, 6));
+  }
 
   async function handleSubmit() {
     if (submitting) return;
     if (!imageFile) {
       setError("사진을 먼저 선택해주세요.");
+      addUploadLog("사진 없음: 업로드 중단");
       return;
     }
     if (!captionReady) {
       setError("캡션은 직접 타이핑 흔적이 필요합니다. 한 글자만 더 입력하거나 캡션을 비워주세요.");
+      addUploadLog("캡션 직타 검증 미완료");
       return;
     }
     setSubmitting(true);
     setError(null);
     setSubmitStatus("스토리를 서버에 업로드 중...");
+    addUploadLog("서버 업로드 시작");
 
     const fd = new FormData();
     fd.append("image", imageFile);
@@ -59,21 +73,25 @@ export function StoryCreateClient() {
         method: "POST",
         body: fd,
       });
+      addUploadLog(`서버 응답 수신: HTTP ${res.status}`);
       const result = (await res.json()) as {
         error?: string;
         redirectTo?: string;
       };
       if (!res.ok || result.error) {
         setError(result.error ?? `스토리 업로드 실패 (HTTP ${res.status})`);
+        addUploadLog("업로드 실패: 화면에 에러 표시");
         setSubmitStatus(null);
         setSubmitting(false);
         return;
       }
       setSubmitStatus("스토리 저장 완료. 화면 이동 중...");
+      addUploadLog("스토리 저장 완료: 뷰어로 이동");
       router.push(result.redirectTo ?? "/story/me");
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "스토리 업로드 실패");
+      addUploadLog("네트워크/브라우저 예외 발생");
       setSubmitStatus(null);
       setSubmitting(false);
     }
@@ -125,6 +143,7 @@ export function StoryCreateClient() {
             onImageCaptured={async (file, nextExif) => {
               setError(null);
               setImageNote("스토리용 이미지로 최적화 중...");
+              addUploadLog(`이미지 선택: ${formatBytes(file.size)}`);
               setExif(nextExif);
               const optimized = await optimizeStoryImage(file);
               if (optimized.size > MAX_STORY_IMAGE_BYTES) {
@@ -135,6 +154,7 @@ export function StoryCreateClient() {
                   )}). 8MB 이하 JPG/PNG/WebP로 올려주세요.`
                 );
                 setImageNote("이미지 최적화 후에도 8MB를 넘어서 업로드를 막았습니다.");
+                addUploadLog("이미지 용량 초과: 업로드 차단");
                 return;
               }
               setImageFile(optimized);
@@ -145,12 +165,14 @@ export function StoryCreateClient() {
                     )}`
                   : `이미지 준비 완료: ${formatBytes(optimized.size)}`
               );
+              addUploadLog(`이미지 준비 완료: ${formatBytes(optimized.size)}`);
             }}
             onReset={() => {
               setImageFile(null);
               setExif(null);
               setImageNote(null);
               setSubmitStatus(null);
+              setUploadLog([]);
               setError(null);
             }}
           />
@@ -194,6 +216,19 @@ export function StoryCreateClient() {
       {submitStatus && !error && (
         <div className="mt-4 rounded-lg border border-line bg-bg-card px-4 py-3 font-serif text-sm text-ink-soft">
           {submitStatus}
+        </div>
+      )}
+
+      {uploadLog.length > 0 && (
+        <div className="mt-4 rounded-lg border border-line bg-bg-card px-4 py-3">
+          <div className="mb-2 font-sans text-[11px] font-medium uppercase tracking-[0.22em] text-ink-faint">
+            Upload log
+          </div>
+          <ul className="space-y-1.5 font-serif text-xs text-ink-soft">
+            {uploadLog.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
         </div>
       )}
 
