@@ -1,5 +1,10 @@
 import Link from "next/link";
-import { Sparkles, UserPlus } from "lucide-react";
+import {
+  GalleryVerticalEnd,
+  MessageCircle,
+  Sparkles,
+  UserRound,
+} from "lucide-react";
 import { FollowButton } from "@/components/FollowButton";
 import { HumanAvatar } from "@/components/HumanAvatar";
 
@@ -10,6 +15,7 @@ export type SuggestedPerson = {
   avatar_url: string | null;
   bio: string | null;
   post_count: number;
+  has_story?: boolean;
 };
 
 export function SuggestedPeopleRail({ people }: { people: SuggestedPerson[] }) {
@@ -42,13 +48,15 @@ export function SuggestedPeopleRail({ people }: { people: SuggestedPerson[] }) {
             className="w-44 shrink-0 border border-line bg-bg-card p-3"
           >
             <Link
-              href={`/profile/${person.username}`}
+              href={person.has_story ? `/story/${person.username}` : `/profile/${person.username}`}
               className="flex min-w-0 items-center gap-3"
+              aria-label={person.has_story ? `@${person.username} 스토리 보기` : `@${person.username} 프로필 보기`}
             >
               <HumanAvatar
                 username={person.username}
                 avatarUrl={person.avatar_url}
                 size="md"
+                ring={person.has_story}
               />
               <span className="min-w-0">
                 <span className="block truncate font-sans text-sm font-medium text-ink">
@@ -65,10 +73,26 @@ export function SuggestedPeopleRail({ people }: { people: SuggestedPerson[] }) {
             </p>
 
             <div className="mt-3 grid grid-cols-[1fr_auto] items-center gap-2">
-              <span className="inline-flex items-center gap-1 font-sans text-[11px] text-ink-faint">
-                <UserPlus size={12} />
-                추천
-              </span>
+              <div className="flex min-w-0 items-center gap-1">
+                <MiniLink
+                  href={`/profile/${person.username}`}
+                  label="프로필"
+                  icon={<UserRound size={13} />}
+                />
+                <MiniLink
+                  href={`/chat/${person.username}`}
+                  label="DM"
+                  icon={<MessageCircle size={13} />}
+                />
+                {person.has_story && (
+                  <MiniLink
+                    href={`/story/${person.username}`}
+                    label="스토리"
+                    icon={<GalleryVerticalEnd size={13} />}
+                    strong
+                  />
+                )}
+              </div>
               <FollowButton
                 targetId={person.id}
                 initialFollowing={false}
@@ -79,5 +103,32 @@ export function SuggestedPeopleRail({ people }: { people: SuggestedPerson[] }) {
         ))}
       </div>
     </section>
+  );
+}
+
+function MiniLink({
+  href,
+  icon,
+  label,
+  strong = false,
+}: {
+  href: string;
+  icon: React.ReactNode;
+  label: string;
+  strong?: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      aria-label={label}
+      className={`grid h-8 w-8 place-items-center border transition-colors ${
+        strong
+          ? "border-ink bg-ink text-bg hover:bg-ink-soft"
+          : "border-line bg-bg text-ink-soft hover:border-ink hover:text-ink"
+      }`}
+      title={label}
+    >
+      {icon}
+    </Link>
   );
 }

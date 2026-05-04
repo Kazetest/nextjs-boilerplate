@@ -5,8 +5,10 @@ import type { ComponentType } from "react";
 import {
   BadgeCheck,
   Camera,
+  GalleryVerticalEnd,
   Hash,
   Images,
+  MessageCircle,
   Search,
   Sparkles,
   UserRound,
@@ -105,6 +107,19 @@ export default async function ExplorePage({
   const peopleRows = ((people ?? []) as ProfileHit[]).filter(
     (p) => p.id !== user.id && !blockedIds.includes(p.id)
   );
+  const peopleIds = peopleRows.map((person) => person.id);
+  const { data: activeStories } =
+    peopleIds.length > 0
+      ? await supabase
+          .from("stories")
+          .select("author_id")
+          .in("author_id", peopleIds)
+          .gt("expires_at", new Date().toISOString())
+          .eq("hidden_by_reports", false)
+      : { data: [] };
+  const storyAuthorIds = new Set(
+    (activeStories ?? []).map((story) => story.author_id)
+  );
   const tagCounts = new Map<string, number>();
   for (const post of rows) {
     for (const tag of extractHashtags(post.caption)) {
@@ -176,36 +191,68 @@ export default async function ExplorePage({
               <EmptyLine text="아직 찾은 계정이 없습니다." />
             ) : (
               <div className="divide-y divide-line">
-                {peopleRows.slice(0, 5).map((person) => (
-                  <div
-                    key={person.id}
-                    className="flex items-center gap-3 px-3 py-3 transition-colors hover:bg-bg"
-                  >
-                    <Link
-                      href={`/profile/${person.username}`}
-                      className="flex min-w-0 flex-1 items-center gap-3"
+                {peopleRows.slice(0, 5).map((person) => {
+                  const hasStory = storyAuthorIds.has(person.id);
+                  return (
+                    <div
+                      key={person.id}
+                      className="px-3 py-3 transition-colors hover:bg-bg"
                     >
-                      <HumanAvatar
-                        username={person.username}
-                        avatarUrl={person.avatar_url}
-                        size="md"
-                      />
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate font-sans text-sm font-medium">
-                          @{person.username}
-                        </span>
-                        <span className="block truncate font-serif text-xs text-ink-faint">
-                          {person.display_name || person.bio || "NOai 사용자"}
-                        </span>
-                      </span>
-                    </Link>
-                    <FollowButton
-                      targetId={person.id}
-                      initialFollowing={followingIds.includes(person.id)}
-                      compact
-                    />
-                  </div>
-                ))}
+                      <div className="flex items-start gap-3">
+                        <Link
+                          href={hasStory ? `/story/${person.username}` : `/profile/${person.username}`}
+                          className="shrink-0"
+                          aria-label={hasStory ? `@${person.username} 스토리 보기` : `@${person.username} 프로필 보기`}
+                        >
+                          <HumanAvatar
+                            username={person.username}
+                            avatarUrl={person.avatar_url}
+                            size="md"
+                            ring={hasStory}
+                          />
+                        </Link>
+                        <div className="min-w-0 flex-1">
+                          <Link
+                            href={`/profile/${person.username}`}
+                            className="group block min-w-0"
+                          >
+                            <span className="block truncate font-sans text-sm font-medium group-hover:underline">
+                              @{person.username}
+                            </span>
+                            <span className="block truncate font-serif text-xs text-ink-faint">
+                              {person.display_name || person.bio || "NOai 사용자"}
+                            </span>
+                          </Link>
+                          <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                            <FollowButton
+                              targetId={person.id}
+                              initialFollowing={followingIds.includes(person.id)}
+                              compact
+                            />
+                            <IconLink
+                              href={`/profile/${person.username}`}
+                              label="프로필"
+                              icon={<UserRound size={14} />}
+                            />
+                            <IconLink
+                              href={`/chat/${person.username}`}
+                              label="DM"
+                              icon={<MessageCircle size={14} />}
+                            />
+                            {hasStory && (
+                              <IconLink
+                                href={`/story/${person.username}`}
+                                label="스토리"
+                                icon={<GalleryVerticalEnd size={14} />}
+                                strong
+                              />
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -325,6 +372,32 @@ function PanelTitle({
 
 function EmptyLine({ text }: { text: string }) {
   return <p className="px-3 py-6 text-center font-serif text-sm text-ink-faint">{text}</p>;
+}
+
+function IconLink({
+  href,
+  icon,
+  label,
+  strong = false,
+}: {
+  href: string;
+  icon: React.ReactNode;
+  label: string;
+  strong?: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      className={`inline-flex h-8 items-center gap-1.5 border px-2.5 font-sans text-xs transition-colors ${
+        strong
+          ? "border-ink bg-ink text-bg hover:bg-ink-soft"
+          : "border-line bg-bg-card text-ink-soft hover:border-ink hover:text-ink"
+      }`}
+    >
+      {icon}
+      {label}
+    </Link>
+  );
 }
 
 function isFreshlyCaptured(post: ExplorePost): boolean {

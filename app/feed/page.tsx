@@ -86,10 +86,14 @@ export default async function FeedPage() {
       (postCountByAuthor.get(post.author_id) ?? 0) + 1
     );
   }
+  const activeStoryAuthorIds = new Set(
+    (rawStories ?? []).map((story) => story.author_id)
+  );
   const suggestedPeople = ((suggestionRows ?? []) as SuggestedPersonRow[]).map(
     (person) => ({
       ...person,
       post_count: postCountByAuthor.get(person.id) ?? 0,
+      has_story: activeStoryAuthorIds.has(person.id),
     })
   );
 
