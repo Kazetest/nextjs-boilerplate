@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
   Camera as CameraIcon,
@@ -15,13 +16,13 @@ import {
 } from "lucide-react";
 import { Camera as HumanCamera } from "@/components/Camera";
 import { CaptionEditor } from "@/components/CaptionEditor";
-import { createStory } from "../actions";
 import type { ExifResult } from "@/lib/exif";
 import type { KeystrokeRecord } from "@/lib/keystroke";
 
 const MAX_STORY_IMAGE_BYTES = 8 * 1024 * 1024;
 
 export function StoryCreateClient() {
+  const router = useRouter();
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [exif, setExif] = useState<ExifResult | null>(null);
   const [imageNote, setImageNote] = useState<string | null>(null);
@@ -52,16 +53,22 @@ export function StoryCreateClient() {
     fd.append("exif", JSON.stringify(exif?.data ?? {}));
 
     try {
-      const result = await createStory(fd);
-      if (result?.error) {
-        setError(result.error);
+      const res = await fetch("/api/stories/create", {
+        method: "POST",
+        body: fd,
+      });
+      const result = (await res.json()) as {
+        error?: string;
+        redirectTo?: string;
+      };
+      if (!res.ok || result.error) {
+        setError(result.error ?? `스토리 업로드 실패 (HTTP ${res.status})`);
         setSubmitting(false);
+        return;
       }
+      router.push(result.redirectTo ?? "/story/me");
+      router.refresh();
     } catch (e) {
-      const digest = (e as { digest?: string })?.digest;
-      if (typeof digest === "string" && digest.startsWith("NEXT_REDIRECT")) {
-        throw e;
-      }
       setError(e instanceof Error ? e.message : "스토리 업로드 실패");
       setSubmitting(false);
     }
