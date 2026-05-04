@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { Camera, Clock3 } from "lucide-react";
+import { Camera, Clock3, HandHeart, MessageCircle } from "lucide-react";
 import { tokenizeCaption } from "@/lib/hashtag";
 import { PostMenu } from "@/components/PostMenu";
 import { HumanAvatar } from "@/components/HumanAvatar";
+import { ShareButton } from "@/components/ShareButton";
 
 export type PostRow = {
   id: string;
@@ -126,6 +127,7 @@ export function PostCard({
       </Link>
 
       <div className="px-4 py-3 space-y-3">
+        <PostFeedActions post={post} />
         <div className="flex flex-wrap items-center gap-2">
           {fresh && (
             <span className="inline-flex items-center gap-1 border border-line bg-bg px-2 py-1 font-sans text-[11px] text-ink-soft">
@@ -140,6 +142,43 @@ export function PostCard({
         </p>
       </div>
     </article>
+  );
+}
+
+function PostFeedActions({ post }: { post: PostRow }) {
+  const authorUsername = post.author?.username ?? null;
+  return (
+    <div className="flex items-center justify-between border-b border-line pb-3">
+      <div className="flex min-w-0 items-center gap-1">
+        <Link
+          href={`/post/${post.id}`}
+          className="inline-flex h-9 items-center gap-2 px-2 font-sans text-sm text-ink-soft transition-colors hover:text-ink"
+        >
+          <HandHeart size={19} />
+          묵례
+        </Link>
+        <Link
+          href={`/post/${post.id}#comments`}
+          className="inline-flex h-9 items-center gap-2 px-2 font-sans text-sm text-ink-soft transition-colors hover:text-ink"
+        >
+          <MessageCircle size={19} />
+          댓글
+        </Link>
+        {authorUsername && (
+          <Link
+            href={`/chat/${authorUsername}`}
+            className="hidden h-9 items-center gap-2 px-2 font-sans text-sm text-ink-soft transition-colors hover:text-ink sm:inline-flex"
+          >
+            DM
+          </Link>
+        )}
+      </div>
+      <ShareButton
+        url={`/post/${post.id}`}
+        title={`@${authorUsername ?? "noai"}의 NOai 게시물`}
+        text={post.caption.slice(0, 80)}
+      />
+    </div>
   );
 }
 
