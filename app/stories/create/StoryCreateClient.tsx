@@ -181,7 +181,13 @@ export function StoryCreateClient() {
 
       {error && (
         <div className="mt-4 rounded-lg border border-warn/40 bg-warn/5 px-4 py-3 font-serif text-sm leading-relaxed text-warn">
-          {error}
+          <p>{error}</p>
+          <Link
+            href="/debug"
+            className="mt-2 inline-flex text-xs text-warn underline underline-offset-4"
+          >
+            진단에서 스토리 업로드 단계 확인
+          </Link>
         </div>
       )}
 
