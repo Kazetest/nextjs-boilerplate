@@ -7,6 +7,7 @@ import type { ComponentType } from "react";
 import {
   Bell,
   Bookmark,
+  Camera,
   Compass,
   Home,
   MessageCircle,
@@ -90,6 +91,12 @@ export function GlobalNav() {
               icon={PlusSquare}
             />
             <NavLink
+              href="/stories/create"
+              label="스토리"
+              current={pathname}
+              icon={Camera}
+            />
+            <NavLink
               href="/notifications"
               label="알림"
               current={pathname}
@@ -120,6 +127,17 @@ export function GlobalNav() {
       </header>
 
       <nav className="sm:hidden fixed bottom-0 inset-x-0 z-30 bg-bg/95 backdrop-blur border-t border-line">
+        <Link
+          href="/stories/create"
+          className={`absolute -top-12 right-4 inline-flex h-10 items-center gap-2 rounded-full border px-4 font-sans text-xs shadow-[0_12px_34px_rgba(26,26,26,0.12)] transition-colors ${
+            pathname.startsWith("/stories")
+              ? "border-ink bg-ink text-bg"
+              : "border-line bg-bg-card text-ink hover:border-ink"
+          }`}
+        >
+          <Camera size={15} />
+          스토리
+        </Link>
         <div className="max-w-xl mx-auto grid grid-cols-6 text-xs font-serif">
           <BottomTab href="/feed" label="피드" current={pathname} icon={Home} />
           <BottomTab
