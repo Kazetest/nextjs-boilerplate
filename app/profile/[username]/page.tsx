@@ -209,6 +209,15 @@ export default async function ProfilePage({
                       targetId={profile.id}
                       initialFollowing={isFollowing}
                     />
+                    {hasStory && (
+                      <Link
+                        href={`/story/${profile.username}`}
+                        className="inline-flex h-10 items-center gap-2 bg-ink px-4 font-sans text-sm text-bg transition-colors hover:bg-ink-soft"
+                      >
+                        <GalleryVerticalEnd size={16} />
+                        스토리 보기
+                      </Link>
+                    )}
                     <Link
                       href={`/chat/${profile.username}`}
                       className="inline-flex h-10 items-center gap-2 border border-line bg-bg-card px-4 font-sans text-sm transition-colors hover:border-ink"
