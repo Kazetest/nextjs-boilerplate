@@ -14,6 +14,8 @@ type Msg = {
   read: boolean;
 };
 
+const QUICK_REPLIES = ["묵례 보냅니다", "직접 찍은 느낌 좋아요", "방금 봤어요"];
+
 export function ChatThreadClient({
   meId,
   otherId,
@@ -204,25 +206,40 @@ export function ChatThreadClient({
 
       <form
         onSubmit={handleSend}
-        className="sticky bottom-0 grid grid-cols-[1fr_auto] gap-2 border-t border-line bg-bg/95 px-3 py-3 backdrop-blur"
+        className="sticky bottom-0 border-t border-line bg-bg/95 px-3 py-3 backdrop-blur"
       >
-        <input
-          type="text"
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          placeholder="메시지 입력 (직접 타이핑하세요)"
-          maxLength={1000}
-          className="min-w-0 border border-line bg-bg-card px-3 py-2 font-serif text-sm outline-none transition-colors focus:border-ink"
-          disabled={sending}
-        />
-        <button
-          type="submit"
-          disabled={sending || !body.trim()}
-          className="grid h-10 w-10 place-items-center bg-ink text-bg transition-colors hover:bg-ink-soft disabled:opacity-40"
-          aria-label="메시지 보내기"
-        >
-          <Send size={16} />
-        </button>
+        <div className="mb-2 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {QUICK_REPLIES.map((reply) => (
+            <button
+              key={reply}
+              type="button"
+              onClick={() => setBody(reply)}
+              disabled={sending}
+              className="shrink-0 rounded-full border border-line bg-bg-card px-3 py-1.5 font-sans text-xs text-ink-soft transition-colors hover:border-ink hover:text-ink disabled:opacity-50"
+            >
+              {reply}
+            </button>
+          ))}
+        </div>
+        <div className="grid grid-cols-[1fr_auto] gap-2">
+          <input
+            type="text"
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            placeholder="메시지 입력 (직접 타이핑하세요)"
+            maxLength={1000}
+            className="min-w-0 border border-line bg-bg-card px-3 py-2 font-serif text-sm outline-none transition-colors focus:border-ink"
+            disabled={sending}
+          />
+          <button
+            type="submit"
+            disabled={sending || !body.trim()}
+            className="grid h-10 w-10 place-items-center bg-ink text-bg transition-colors hover:bg-ink-soft disabled:opacity-40"
+            aria-label="메시지 보내기"
+          >
+            <Send size={16} />
+          </button>
+        </div>
       </form>
 
       {error && (
