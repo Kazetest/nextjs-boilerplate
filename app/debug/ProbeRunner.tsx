@@ -44,7 +44,7 @@ export function ProbeRunner() {
         disabled={running}
         className="px-5 py-2.5 bg-ink text-bg hover:bg-ink-soft disabled:opacity-50 transition-colors text-sm font-serif"
       >
-        {running ? "실행 중..." : "▶ P2 게시 동선 시뮬 실행"}
+        {running ? "실행 중..." : "▶ 게시/스토리 동선 시뮬 실행"}
       </button>
 
       {error && (

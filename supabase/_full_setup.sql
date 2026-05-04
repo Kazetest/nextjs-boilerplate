@@ -20,6 +20,7 @@
 -- ============================================================
 
 create extension if not exists "uuid-ossp";
+create extension if not exists "pgcrypto";
 
 create table if not exists public.profiles (
   id uuid references auth.users on delete cascade primary key,

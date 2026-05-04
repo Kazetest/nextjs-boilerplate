@@ -187,8 +187,8 @@ export default async function DebugPage() {
       {/* P2 — Live Probe */}
       <Section
         n="04"
-        title="P2 게시 동선 라이브 시뮬"
-        subtitle="storage upload + posts insert + SightEngine ping (실측 ms)"
+        title="P2 게시/스토리 라이브 시뮬"
+        subtitle="posts + stories upload/insert/view + SightEngine ping (실측 ms)"
       >
         {!user ? (
           <p className="text-sm text-ink-faint font-serif">

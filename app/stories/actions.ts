@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -91,8 +92,35 @@ export async function createStory(formData: FormData): Promise<StoryResult> {
     ? ext
     : "jpg";
   const path = `${user.id}/${crypto.randomUUID()}.${safeExt}`;
+  const admin = createAdminClient();
+  const storage = admin ?? supabase;
 
-  const { error: uploadError } = await supabase.storage
+  if (admin) {
+    const { error: bucketLookupError } = await admin.storage.getBucket("stories");
+    if (bucketLookupError) {
+      const { error: bucketCreateError } = await admin.storage.createBucket(
+        "stories",
+        {
+          public: true,
+          fileSizeLimit: 8 * 1024 * 1024,
+          allowedMimeTypes: [
+            "image/jpeg",
+            "image/png",
+            "image/webp",
+            "image/heic",
+            "image/heif",
+          ],
+        }
+      );
+      if (bucketCreateError && !/already exists/i.test(bucketCreateError.message)) {
+        return {
+          error: `stories 버킷 생성 실패: ${bucketCreateError.message} — Vercel SUPABASE_SERVICE_ROLE_KEY 확인 필요.`,
+        };
+      }
+    }
+  }
+
+  const { error: uploadError } = await storage.storage
     .from("stories")
     .upload(path, image, {
       contentType: image.type || `image/${safeExt}`,
@@ -126,7 +154,7 @@ export async function createStory(formData: FormData): Promise<StoryResult> {
     .single();
 
   if (insertError) {
-    await supabase.storage.from("stories").remove([path]);
+    await storage.storage.from("stories").remove([path]);
     const hint = /stories|story_views|schema cache|relation|column/i.test(insertError.message)
       ? " — 005_stories.sql 또는 _full_setup.sql 적용 필요."
       : /row-level security|violates/i.test(insertError.message)

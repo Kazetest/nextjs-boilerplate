@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -18,6 +19,7 @@ export async function POST() {
 
   const steps: Step[] = [];
   const tick = () => Date.now() - t0;
+  const admin = createAdminClient();
 
   // 1. storage 'posts' bucket — list 자기 폴더
   {
@@ -134,7 +136,149 @@ export async function POST() {
     }
   }
 
-  // 4. SightEngine (env 활성 시 1x1 PNG ping, timeout 3초로 짧게)
+  // 4. Stories probe — 실제 스토리 업로드/insert/view upsert 경로
+  const storyPath = `${user.id}/__story-probe-${Date.now()}.png`;
+  let storyId: string | null = null;
+  let storyUploaded = false;
+  {
+    const stageStart = tick();
+    if (!admin) {
+      steps.push({
+        stage: "stories admin storage",
+        ok: false,
+        detail: "SUPABASE_SERVICE_ROLE_KEY 없음",
+        hint: "Vercel 환경변수 SUPABASE_SERVICE_ROLE_KEY 확인",
+        ms: tick() - stageStart,
+      });
+    } else {
+      const { error: bucketLookupError } = await admin.storage.getBucket("stories");
+      if (bucketLookupError) {
+        const { error: bucketCreateError } = await admin.storage.createBucket(
+          "stories",
+          {
+            public: true,
+            fileSizeLimit: 8 * 1024 * 1024,
+            allowedMimeTypes: ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"],
+          }
+        );
+        if (bucketCreateError && !/already exists/i.test(bucketCreateError.message)) {
+          steps.push({
+            stage: "stories admin storage",
+            ok: false,
+            detail: bucketCreateError.message,
+            hint: "stories bucket 생성 실패 — service role 권한 확인",
+            ms: tick() - stageStart,
+          });
+        }
+      }
+
+      if (!steps.some((s) => s.stage === "stories admin storage" && !s.ok)) {
+        const tinyPng = Uint8Array.from(
+          atob(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
+          ),
+          (c) => c.charCodeAt(0)
+        );
+        const { error } = await admin.storage
+          .from("stories")
+          .upload(storyPath, new Blob([tinyPng], { type: "image/png" }), {
+            contentType: "image/png",
+            upsert: false,
+          });
+        const ms = tick() - stageStart;
+        if (error) {
+          steps.push({
+            stage: "stories admin upload",
+            ok: false,
+            detail: error.message,
+            hint: "stories bucket 또는 service role storage 권한 확인",
+            ms,
+          });
+        } else {
+          storyUploaded = true;
+          steps.push({
+            stage: "stories admin upload",
+            ok: true,
+            detail: "OK (정리 예정)",
+            ms,
+          });
+        }
+      }
+    }
+  }
+
+  if (admin && storyUploaded) {
+    const stageStart = tick();
+    const {
+      data: { publicUrl },
+    } = admin.storage.from("stories").getPublicUrl(storyPath);
+    const { data: story, error } = await supabase
+      .from("stories")
+      .insert({
+        author_id: user.id,
+        image_url: publicUrl,
+        image_path: storyPath,
+        caption: "__story_probe__",
+        caption_keystrokes: null,
+        exif_data: {},
+      })
+      .select("id")
+      .single();
+    const ms = tick() - stageStart;
+    if (error) {
+      let hint: string | undefined;
+      if (/stories|schema cache|relation|column/i.test(error.message)) {
+        hint = "005_stories.sql 또는 supabase/_full_setup.sql 미적용";
+      } else if (/profiles|foreign key/i.test(error.message)) {
+        hint = "profile row 없음 — /onboarding self-heal 확인";
+      } else if (/row-level security|violates/i.test(error.message)) {
+        hint = "stories insert RLS 정책 확인";
+      }
+      steps.push({ stage: "stories insert probe", ok: false, detail: error.message, hint, ms });
+      await admin.storage.from("stories").remove([storyPath]);
+    } else if (story) {
+      storyId = story.id;
+      steps.push({
+        stage: "stories insert probe",
+        ok: true,
+        detail: `OK id=${story.id.slice(0, 8)}…`,
+        ms,
+      });
+    }
+  }
+
+  if (storyId) {
+    const stageStart = tick();
+    const { error } = await supabase.from("story_views").upsert(
+      {
+        story_id: storyId,
+        viewer_id: user.id,
+        viewed_at: new Date().toISOString(),
+      },
+      { onConflict: "story_id,viewer_id" }
+    );
+    const ms = tick() - stageStart;
+    if (error) {
+      const hint = /story_views|schema cache|relation|column/i.test(error.message)
+        ? "story_views 테이블 없음 — supabase/_full_setup.sql 미적용"
+        : /row-level security|violates/i.test(error.message)
+        ? "story_views RLS 정책 확인"
+        : undefined;
+      steps.push({ stage: "story_views upsert probe", ok: false, detail: error.message, hint, ms });
+    } else {
+      steps.push({
+        stage: "story_views upsert probe",
+        ok: true,
+        detail: "OK",
+        ms,
+      });
+    }
+
+    await supabase.from("stories").delete().eq("id", storyId);
+    await admin?.storage.from("stories").remove([storyPath]);
+  }
+
+  // 5. SightEngine (env 활성 시 1x1 PNG ping, timeout 3초로 짧게)
   const seUser = process.env.SIGHTENGINE_API_USER;
   const seSecret = process.env.SIGHTENGINE_API_SECRET;
   if (!seUser || !seSecret) {

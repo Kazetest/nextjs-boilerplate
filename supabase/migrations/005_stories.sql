@@ -3,6 +3,8 @@
 -- 24h stories: active human moments + seen state.
 -- ============================================================
 
+create extension if not exists "pgcrypto";
+
 create table if not exists public.stories (
   id uuid primary key default gen_random_uuid(),
   author_id uuid not null references public.profiles(id) on delete cascade,
