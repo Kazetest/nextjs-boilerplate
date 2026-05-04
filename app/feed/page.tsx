@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { Bell, Camera, MessageCircle, Plus } from "lucide-react";
 import { PostCard, type PostRow } from "@/components/PostCard";
 import { StoryRail, type StoryRailItem } from "@/components/StoryRail";
 import {
@@ -135,6 +136,9 @@ export default async function FeedPage() {
   const storyItems = [...storyMap.values()].sort(
     (a, b) => new Date(b.latest_at).getTime() - new Date(a.latest_at).getTime()
   );
+  const unseenStoryCount = storyItems.filter(
+    (item) => item.seen_count < item.story_count
+  ).length;
 
   let query = supabase
     .from("posts")
@@ -156,6 +160,11 @@ export default async function FeedPage() {
   return (
     <div className="relative z-10 flex flex-col flex-1 w-full">
       <main className="max-w-xl mx-auto px-4 py-6 w-full">
+        <FeedActionBar
+          username={me?.username ?? null}
+          unseenStoryCount={unseenStoryCount}
+          postCount={rows.length}
+        />
         <StoryRail
           items={storyItems}
           currentUsername={me?.username ?? null}
@@ -201,6 +210,71 @@ export default async function FeedPage() {
         )}
       </main>
     </div>
+  );
+}
+
+function FeedActionBar({
+  username,
+  unseenStoryCount,
+  postCount,
+}: {
+  username: string | null;
+  unseenStoryCount: number;
+  postCount: number;
+}) {
+  return (
+    <section className="mb-5 border border-line bg-bg-card">
+      <div className="grid grid-cols-[1fr_auto] gap-3 border-b border-line px-4 py-3">
+        <div className="min-w-0">
+          <p className="font-sans text-[10px] font-medium uppercase tracking-[0.26em] text-ink-faint">
+            Live feed
+          </p>
+          <h1 className="truncate font-serif text-2xl">
+            {username ? `@${username}` : "NOai"}
+          </h1>
+        </div>
+        <Link
+          href="/stories/create"
+          className="inline-flex h-10 items-center gap-2 rounded-full bg-ink px-4 font-sans text-sm text-bg transition-colors hover:bg-ink-soft"
+        >
+          <Plus size={16} />
+          스토리
+        </Link>
+      </div>
+      <div className="grid grid-cols-4 divide-x divide-line">
+        <FeedQuickLink href="/create" icon={<Camera size={16} />} label="게시" value={`${postCount}`} />
+        <FeedQuickLink href="/stories/create" icon={<Plus size={16} />} label="스토리" value={`${unseenStoryCount}`} />
+        <FeedQuickLink href="/chat" icon={<MessageCircle size={16} />} label="DM" value="바로" />
+        <FeedQuickLink href="/notifications" icon={<Bell size={16} />} label="알림" value="확인" />
+      </div>
+    </section>
+  );
+}
+
+function FeedQuickLink({
+  href,
+  icon,
+  label,
+  value,
+}: {
+  href: string;
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="flex min-w-0 flex-col gap-2 px-3 py-3 transition-colors hover:bg-bg"
+    >
+      <span className="flex items-center justify-between gap-2 text-ink-soft">
+        {icon}
+        <span className="font-sans text-xs text-ink">{value}</span>
+      </span>
+      <span className="truncate font-sans text-[11px] text-ink-faint">
+        {label}
+      </span>
+    </Link>
   );
 }
 
