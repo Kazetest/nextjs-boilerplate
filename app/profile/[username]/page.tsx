@@ -7,6 +7,7 @@ import {
   Camera,
   GalleryVerticalEnd,
   Grid3X3,
+  HeartHandshake,
   ImageOff,
   MessageCircle,
   Plus,
@@ -98,7 +99,34 @@ export default async function ProfilePage({
   const isMe = user.id === profile.id;
   const isFollowing = !!following;
   const hasStory = (stories ?? []).length > 0;
-  const visiblePosts = posts ?? [];
+  const rawPosts = posts ?? [];
+  const postIds = rawPosts.map((post) => post.id);
+  const [{ data: reactionRows }, { data: commentRows }] =
+    postIds.length > 0
+      ? await Promise.all([
+          supabase.from("reactions").select("post_id").in("post_id", postIds),
+          supabase.from("comments").select("post_id").in("post_id", postIds),
+        ])
+      : [{ data: [] }, { data: [] }];
+  const reactionCountByPost = new Map<string, number>();
+  const commentCountByPost = new Map<string, number>();
+  for (const reaction of reactionRows ?? []) {
+    reactionCountByPost.set(
+      reaction.post_id,
+      (reactionCountByPost.get(reaction.post_id) ?? 0) + 1
+    );
+  }
+  for (const comment of commentRows ?? []) {
+    commentCountByPost.set(
+      comment.post_id,
+      (commentCountByPost.get(comment.post_id) ?? 0) + 1
+    );
+  }
+  const visiblePosts = rawPosts.map((post) => ({
+    ...post,
+    reaction_count: reactionCountByPost.get(post.id) ?? 0,
+    comment_count: commentCountByPost.get(post.id) ?? 0,
+  }));
   const freshPostCount = visiblePosts.filter(isFreshlyCaptured).length;
   const originalPostCount = visiblePosts.filter(
     (post) => post.origin_type === "original"
@@ -253,25 +281,37 @@ export default async function ProfilePage({
                     alt={p.caption.slice(0, 40)}
                     className="h-full w-full object-cover transition duration-200 group-hover:scale-[1.02] group-hover:opacity-90"
                   />
-                  <div className="absolute inset-x-0 bottom-0 flex flex-wrap gap-1 bg-gradient-to-t from-ink/55 to-transparent p-1.5 opacity-0 transition-opacity group-hover:opacity-100">
-                    {fresh && (
-                      <span className="inline-flex items-center gap-1 bg-bg/90 px-1.5 py-0.5 font-sans text-[10px] text-ink">
-                        <Camera size={11} />
-                        직촬
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink/65 to-transparent p-1.5 text-bg opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
+                    <div className="flex flex-wrap gap-1">
+                      {fresh && (
+                        <span className="inline-flex items-center gap-1 bg-bg/90 px-1.5 py-0.5 font-sans text-[10px] text-ink">
+                          <Camera size={11} />
+                          직촬
+                        </span>
+                      )}
+                      {p.origin_type === "original" && (
+                        <span className="inline-flex items-center gap-1 bg-bg/90 px-1.5 py-0.5 font-sans text-[10px] text-ink">
+                          <BadgeCheck size={11} />
+                          원본
+                        </span>
+                      )}
+                      {typeof p.ai_score === "number" && p.ai_score < 0.5 && (
+                        <span className="inline-flex items-center gap-1 bg-bg/90 px-1.5 py-0.5 font-sans text-[10px] text-ink">
+                          <ShieldCheck size={11} />
+                          검증
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-1 flex items-center gap-2 font-sans text-[11px] text-bg/85">
+                      <span className="inline-flex items-center gap-1">
+                        <HeartHandshake size={12} />
+                        {p.reaction_count}
                       </span>
-                    )}
-                    {p.origin_type === "original" && (
-                      <span className="inline-flex items-center gap-1 bg-bg/90 px-1.5 py-0.5 font-sans text-[10px] text-ink">
-                        <BadgeCheck size={11} />
-                        원본
+                      <span className="inline-flex items-center gap-1">
+                        <MessageCircle size={12} />
+                        {p.comment_count}
                       </span>
-                    )}
-                    {typeof p.ai_score === "number" && p.ai_score < 0.5 && (
-                      <span className="inline-flex items-center gap-1 bg-bg/90 px-1.5 py-0.5 font-sans text-[10px] text-ink">
-                        <ShieldCheck size={11} />
-                        검증
-                      </span>
-                    )}
+                    </div>
                   </div>
                 </Link>
               );

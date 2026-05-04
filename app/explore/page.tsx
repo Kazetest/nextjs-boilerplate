@@ -7,6 +7,7 @@ import {
   Camera,
   GalleryVerticalEnd,
   Hash,
+  HeartHandshake,
   Images,
   MessageCircle,
   Search,
@@ -37,6 +38,8 @@ type ExplorePost = {
   origin_type: "original" | "inspired_by_user" | "overseas_meme";
   created_at: string;
   author: { username: string } | null;
+  reaction_count?: number;
+  comment_count?: number;
 };
 
 export default async function ExplorePage({
@@ -103,7 +106,34 @@ export default async function ExplorePage({
           .limit(8),
   ]);
 
-  const rows = (posts ?? []) as unknown as ExplorePost[];
+  const baseRows = (posts ?? []) as unknown as ExplorePost[];
+  const postIds = baseRows.map((post) => post.id);
+  const [{ data: reactionRows }, { data: commentRows }] =
+    postIds.length > 0
+      ? await Promise.all([
+          supabase.from("reactions").select("post_id").in("post_id", postIds),
+          supabase.from("comments").select("post_id").in("post_id", postIds),
+        ])
+      : [{ data: [] }, { data: [] }];
+  const reactionCountByPost = new Map<string, number>();
+  const commentCountByPost = new Map<string, number>();
+  for (const reaction of reactionRows ?? []) {
+    reactionCountByPost.set(
+      reaction.post_id,
+      (reactionCountByPost.get(reaction.post_id) ?? 0) + 1
+    );
+  }
+  for (const comment of commentRows ?? []) {
+    commentCountByPost.set(
+      comment.post_id,
+      (commentCountByPost.get(comment.post_id) ?? 0) + 1
+    );
+  }
+  const rows = baseRows.map((post) => ({
+    ...post,
+    reaction_count: reactionCountByPost.get(post.id) ?? 0,
+    comment_count: commentCountByPost.get(post.id) ?? 0,
+  }));
   const peopleRows = ((people ?? []) as ProfileHit[]).filter(
     (p) => p.id !== user.id && !blockedIds.includes(p.id)
   );
@@ -304,7 +334,7 @@ export default async function ExplorePage({
                     alt={p.caption.slice(0, 40)}
                     className="h-full w-full object-cover"
                   />
-                  <div className="absolute inset-x-0 bottom-0 hidden bg-gradient-to-t from-black/55 to-transparent p-2 text-white group-hover:block">
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/65 to-transparent p-2 text-white opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
                     <div className="flex flex-wrap items-center gap-1">
                       <span className="truncate font-sans text-[11px]">
                         @{p.author?.username ?? "unknown"}
@@ -321,6 +351,16 @@ export default async function ExplorePage({
                           원본
                         </span>
                       )}
+                    </div>
+                    <div className="mt-1 flex items-center gap-2 font-sans text-[11px] text-white/85">
+                      <span className="inline-flex items-center gap-1">
+                        <HeartHandshake size={12} />
+                        {p.reaction_count ?? 0}
+                      </span>
+                      <span className="inline-flex items-center gap-1">
+                        <MessageCircle size={12} />
+                        {p.comment_count ?? 0}
+                      </span>
                     </div>
                   </div>
                 </Link>
