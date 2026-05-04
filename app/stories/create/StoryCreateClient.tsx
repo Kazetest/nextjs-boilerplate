@@ -22,6 +22,7 @@ import type { KeystrokeRecord } from "@/lib/keystroke";
 export function StoryCreateClient() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [exif, setExif] = useState<ExifResult | null>(null);
+  const [imageNote, setImageNote] = useState<string | null>(null);
   const [caption, setCaption] = useState("");
   const [keystrokes, setKeystrokes] = useState<KeystrokeRecord | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -107,13 +108,35 @@ export function StoryCreateClient() {
         </div>
         <div className="p-3">
           <HumanCamera
-            onImageCaptured={(file, nextExif) => {
-              setImageFile(file);
+            onImageCaptured={async (file, nextExif) => {
+              setError(null);
+              setImageNote("스토리용 이미지로 최적화 중...");
               setExif(nextExif);
+              const optimized = await optimizeStoryImage(file);
+              setImageFile(optimized);
+              setImageNote(
+                optimized.size < file.size
+                  ? `이미지 최적화 완료: ${formatBytes(file.size)} → ${formatBytes(
+                      optimized.size
+                    )}`
+                  : `이미지 준비 완료: ${formatBytes(optimized.size)}`
+              );
+            }}
+            onReset={() => {
+              setImageFile(null);
+              setExif(null);
+              setImageNote(null);
+              setError(null);
             }}
           />
         </div>
       </div>
+
+      {imageNote && (
+        <p className="mt-2 px-1 font-serif text-xs text-ink-faint">
+          {imageNote}
+        </p>
+      )}
 
       <div className="mt-5 rounded-lg border border-line bg-bg-card p-4">
         <CaptionEditor
@@ -268,4 +291,62 @@ function isStoryCaptionReady(
     !!keystrokes &&
     keystrokes.strokes.length >= Math.max(1, Math.ceil(trimmed.length * 0.2))
   );
+}
+
+async function optimizeStoryImage(file: File) {
+  if (!file.type.startsWith("image/") || file.type.includes("heic")) return file;
+
+  try {
+    const bitmap = await createImageBitmap(file);
+    const maxWidth = 1440;
+    const maxHeight = 1800;
+    const scale = Math.min(1, maxWidth / bitmap.width, maxHeight / bitmap.height);
+    const width = Math.max(1, Math.round(bitmap.width * scale));
+    const height = Math.max(1, Math.round(bitmap.height * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return file;
+
+    ctx.drawImage(bitmap, 0, 0, width, height);
+    bitmap.close();
+
+    const targetBytes = 2.8 * 1024 * 1024;
+    for (const quality of [0.86, 0.78, 0.7, 0.62]) {
+      const blob = await canvasToBlob(canvas, "image/jpeg", quality);
+      if (!blob) continue;
+      if (blob.size <= targetBytes || quality === 0.62) {
+        if (blob.size >= file.size && file.size <= targetBytes) return file;
+        return new File([blob], replaceExtension(file.name, "jpg"), {
+          type: "image/jpeg",
+          lastModified: file.lastModified,
+        });
+      }
+    }
+  } catch {
+    return file;
+  }
+
+  return file;
+}
+
+function canvasToBlob(
+  canvas: HTMLCanvasElement,
+  type: string,
+  quality: number
+) {
+  return new Promise<Blob | null>((resolve) =>
+    canvas.toBlob((blob) => resolve(blob), type, quality)
+  );
+}
+
+function replaceExtension(name: string, ext: string) {
+  const base = name.replace(/\.[^.]+$/, "");
+  return `${base || "story"}.${ext}`;
+}
+
+function formatBytes(size: number) {
+  if (size < 1024 * 1024) return `${Math.max(1, Math.round(size / 1024))}KB`;
+  return `${(size / 1024 / 1024).toFixed(1)}MB`;
 }

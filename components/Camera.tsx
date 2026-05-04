@@ -5,9 +5,10 @@ import { extractExif, type ExifResult } from "@/lib/exif";
 
 type Props = {
   onImageCaptured: (file: File, exif: ExifResult) => void;
+  onReset?: () => void;
 };
 
-export function Camera({ onImageCaptured }: Props) {
+export function Camera({ onImageCaptured, onReset }: Props) {
   const [preview, setPreview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -44,6 +45,7 @@ export function Camera({ onImageCaptured }: Props) {
     if (preview) URL.revokeObjectURL(preview);
     setPreview(null);
     setError(null);
+    onReset?.();
     if (inputRef.current) inputRef.current.value = "";
   }
 
