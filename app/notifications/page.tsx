@@ -118,6 +118,8 @@ export default async function NotificationsPage({
         />
       </section>
 
+      <NotificationFocus unreadCount={unreadCount} latest={rows[0] ?? null} />
+
       <nav className="mb-5 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {filters.map((item) => {
           const active = activeFilter === item.key;
@@ -196,6 +198,58 @@ function normalizeFilter(value?: string): FilterKey {
     return value;
   }
   return "all";
+}
+
+function NotificationFocus({
+  unreadCount,
+  latest,
+}: {
+  unreadCount: number;
+  latest: Row | null;
+}) {
+  if (unreadCount > 0) {
+    return (
+      <section className="mb-5 border border-ink bg-ink px-4 py-3 text-bg">
+        <div className="flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            <p className="font-sans text-[10px] uppercase tracking-[0.24em] text-bg/55">
+              Needs attention
+            </p>
+            <p className="truncate font-serif text-lg">
+              읽지 않은 알림 {unreadCount}개
+            </p>
+          </div>
+          <Link
+            href="/notifications?filter=unread"
+            className="shrink-0 rounded-full border border-bg/35 px-3 py-1.5 font-sans text-xs text-bg transition-colors hover:bg-bg hover:text-ink"
+          >
+            보기
+          </Link>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="mb-5 border border-line bg-bg-card px-4 py-3">
+      <div className="flex items-center justify-between gap-4">
+        <div className="min-w-0">
+          <p className="font-sans text-[10px] uppercase tracking-[0.24em] text-ink-faint">
+            All clear
+          </p>
+          <p className="truncate font-serif text-sm text-ink-soft">
+            {latest ? `최근 알림 ${relative(latest.created_at)}` : "새 알림이 없습니다"}
+          </p>
+        </div>
+        <Link
+          href="/feed"
+          className="shrink-0 rounded-full border border-line px-3 py-1.5 font-sans text-xs text-ink-soft transition-colors hover:border-ink hover:text-ink"
+        >
+          피드로
+        </Link>
+      </div>
+    </section>
+  );
 }
 
 function ActivityStat({
