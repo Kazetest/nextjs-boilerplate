@@ -2,7 +2,7 @@
 
 ## ✅ 완료 (D-Day까지)
 
-- [x] Vercel 배포 (`https://nextjs-boilerplate-one-rosy-552q3lxzl7.vercel.app`)
+- [x] Vercel 배포 (`https://noai.kr`)
 - [x] Supabase Auth (Google OAuth + 매직링크)
 - [x] DB 스키마 + RLS
 - [x] 모더레이션 마이그레이션 (002)
@@ -13,6 +13,11 @@
 - [x] PWA manifest
 - [x] 이용약관 + 개인정보처리방침
 - [x] /404 + /error 페이지
+- [x] DM + 통합 알림
+- [x] 24시간 스토리
+- [x] 프로필 편집 + 아바타 업로드
+- [x] 개인 저장 게시물
+- [x] `/debug` 운영 진단 + P2 게시 라이브 시뮬레이션
 
 ## 🚦 출시 전 (D-1)
 
@@ -69,8 +74,6 @@
 
 - [ ] 네이티브 iOS/Android 앱 (PWA → React Native)
 - [ ] Kakao OAuth (비즈채널 승인 후)
-- [ ] 24시간 스토리
-- [ ] DM
 - [ ] 좋아요 → "묵례" 다양화 (감탄/공감/배움)
 - [ ] AI 유사 이미지 자동 검색 (원작 미표기 자동 감지)
 

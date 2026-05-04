@@ -9,9 +9,13 @@ const PROTECTED_ROUTES = [
   "/explore",
   "/onboarding",
   "/post",
+  "/story",
+  "/stories",
   "/tag",
   "/chat",
   "/notifications",
+  "/saved",
+  "/settings",
 ];
 
 // 온보딩 미완료(username이 user_로 시작) 상태에서도 접근 허용되는 경로
@@ -19,10 +23,28 @@ const ONBOARDING_EXEMPT = ["/onboarding", "/auth", "/login", "/legal"];
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
+  const pathname = request.nextUrl.pathname;
+  const isProtected = PROTECTED_ROUTES.some((p) => pathname.startsWith(p));
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !supabaseKey) {
+    if (isProtected) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      url.searchParams.set("error", "env_missing");
+      url.searchParams.set(
+        "detail",
+        "NEXT_PUBLIC_SUPABASE_URL/NEXT_PUBLIC_SUPABASE_ANON_KEY"
+      );
+      return NextResponse.redirect(url);
+    }
+    return supabaseResponse;
+  }
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseKey,
     {
       cookies: {
         getAll() {
@@ -44,9 +66,6 @@ export async function updateSession(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-
-  const pathname = request.nextUrl.pathname;
-  const isProtected = PROTECTED_ROUTES.some((p) => pathname.startsWith(p));
 
   if (!user && isProtected) {
     const url = request.nextUrl.clone();

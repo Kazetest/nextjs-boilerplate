@@ -64,11 +64,14 @@ create policy "messages_delete_own_sent"
 -- 대화 스레드 목록 RPC
 -- 각 1:1 페어별로 최신 메시지 1건 + 미읽음 수
 -- ------------------------------------------------------------
-create or replace function public.list_chat_threads()
+drop function if exists public.list_chat_threads();
+
+create function public.list_chat_threads()
 returns table (
   other_id uuid,
   other_username text,
   other_display_name text,
+  other_avatar_url text,
   last_message text,
   last_at timestamptz,
   last_from_me boolean,
@@ -101,6 +104,7 @@ as $$
     p.other_id,
     pr.username,
     pr.display_name,
+    pr.avatar_url,
     p.body,
     p.created_at,
     (p.sender_id = (select uid from me)) as last_from_me,

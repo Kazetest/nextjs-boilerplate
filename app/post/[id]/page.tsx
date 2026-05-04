@@ -4,9 +4,9 @@ import Link from "next/link";
 import { PostCard, type PostRow } from "@/components/PostCard";
 import { AuthenticityCard } from "@/components/AuthenticityCard";
 import { KeystrokeReplay } from "@/components/KeystrokeReplay";
-import { ReactionButton } from "@/components/ReactionButton";
 import { CommentSection } from "@/components/CommentSection";
-import { ShareButton } from "@/components/ShareButton";
+import { AICheckKickoff } from "@/components/AICheckKickoff";
+import { PostActionBar } from "@/components/PostActionBar";
 import type { KeystrokeRecord } from "@/lib/keystroke";
 
 export const dynamic = "force-dynamic";
@@ -26,8 +26,8 @@ export default async function PostPage({
   const { data: post } = await supabase
     .from("posts")
     .select(
-      `id, author_id, image_url, caption, caption_keystrokes, exif_data, origin_type, origin_creator_username, origin_label, hidden_by_reports, report_count, created_at,
-       author:profiles!posts_author_id_fkey(username, display_name)`
+      `id, author_id, image_url, caption, caption_keystrokes, exif_data, ai_score, origin_type, origin_creator_username, origin_label, hidden_by_reports, report_count, created_at,
+       author:profiles!posts_author_id_fkey(username, display_name, avatar_url)`
     )
     .eq("id", id)
     .maybeSingle();
@@ -47,24 +47,37 @@ export default async function PostPage({
     .eq("post_id", id)
     .maybeSingle();
 
+  const { data: mySave } = await supabase
+    .from("saved_posts")
+    .select("post_id")
+    .eq("user_id", user.id)
+    .eq("post_id", id)
+    .maybeSingle();
+
   const { data: comments } = await supabase
     .from("comments")
     .select(
-      `id, body, created_at, author:profiles!comments_author_id_fkey(username)`
+      `id, body, created_at, author:profiles!comments_author_id_fkey(username, avatar_url)`
     )
     .eq("post_id", id)
     .order("created_at", { ascending: true });
 
   const { data: myProfile } = await supabase
     .from("profiles")
-    .select("username")
+    .select("username, avatar_url")
     .eq("id", user.id)
     .maybeSingle();
 
   const keystrokes = post.caption_keystrokes as KeystrokeRecord | null;
+  const shouldCheckAI =
+    !!process.env.SIGHTENGINE_API_USER &&
+    !!process.env.SIGHTENGINE_API_SECRET &&
+    post.ai_score === null &&
+    !post.hidden_by_reports;
 
   return (
     <div className="relative z-10 flex flex-col flex-1 w-full">
+      {shouldCheckAI && <AICheckKickoff postId={id} />}
       <header className="sticky top-0 z-20 bg-bg/80 backdrop-blur border-b border-line">
         <div className="max-w-xl mx-auto px-4 h-14 flex items-center justify-between">
           <Link href="/feed" className="font-serif text-xl tracking-tight">
@@ -82,23 +95,15 @@ export default async function PostPage({
       <main className="max-w-xl mx-auto px-4 py-6 w-full space-y-8">
         <PostCard post={post as unknown as PostRow} currentUserId={user.id} />
 
-        <div className="flex items-center justify-between gap-4 px-4">
-          <div className="flex items-center gap-6">
-            <ReactionButton
-              postId={id}
-              initialReacted={!!myReaction}
-              initialCount={reactionCount ?? 0}
-            />
-            <span className="text-sm text-ink-faint font-serif">
-              댓글 {comments?.length ?? 0}
-            </span>
-          </div>
-          <ShareButton
-            url={`/post/${id}`}
-            title={`@${postRow.author?.username ?? "noai"} on NOai`}
-            text={postRow.caption.slice(0, 100)}
-          />
-        </div>
+        <PostActionBar
+          postId={id}
+          initialReacted={!!myReaction}
+          initialReactionCount={reactionCount ?? 0}
+          commentCount={comments?.length ?? 0}
+          initialSaved={!!mySave}
+          shareTitle={`@${postRow.author?.username ?? "noai"} on NOai`}
+          shareText={postRow.caption.slice(0, 100)}
+        />
 
         <AuthenticityCard post={post as unknown as PostRow} />
 
@@ -120,9 +125,10 @@ export default async function PostPage({
             id: string;
             body: string;
             created_at: string;
-            author: { username: string } | null;
+            author: { username: string; avatar_url?: string | null } | null;
           }[]}
           currentUsername={myProfile?.username ?? "me"}
+          currentAvatarUrl={myProfile?.avatar_url}
         />
       </main>
     </div>

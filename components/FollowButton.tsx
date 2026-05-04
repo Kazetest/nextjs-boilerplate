@@ -1,14 +1,17 @@
 "use client";
 
+import { Loader2, UserCheck, UserPlus } from "lucide-react";
 import { useState, useTransition } from "react";
 import { toggleFollow } from "@/app/post/actions";
 
 export function FollowButton({
   targetId,
   initialFollowing,
+  compact = false,
 }: {
   targetId: string;
   initialFollowing: boolean;
+  compact?: boolean;
 }) {
   const [following, setFollowing] = useState(initialFollowing);
   const [pending, startTransition] = useTransition();
@@ -24,15 +27,26 @@ export function FollowButton({
 
   return (
     <button
+      type="button"
       onClick={handle}
       disabled={pending}
-      className={`px-6 py-2 font-serif text-sm transition-colors disabled:opacity-50 ${
+      className={`inline-flex items-center gap-2 font-sans transition-colors disabled:opacity-60 ${
+        compact ? "h-8 px-2 text-xs" : "h-10 px-4 text-sm"
+      } ${
         following
-          ? "border border-line text-ink hover:border-ink"
+          ? "border border-line bg-bg-card text-ink hover:border-ink"
           : "bg-ink text-bg hover:bg-ink-soft"
       }`}
+      aria-pressed={following}
     >
-      {following ? "팔로잉" : "팔로우"}
+      {pending ? (
+        <Loader2 size={16} className="animate-spin" />
+      ) : following ? (
+        <UserCheck size={16} />
+      ) : (
+        <UserPlus size={16} />
+      )}
+      {pending ? "처리 중" : following ? "팔로잉" : "팔로우"}
     </button>
   );
 }

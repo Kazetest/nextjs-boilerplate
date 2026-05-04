@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { CheckCheck, Send, ShieldCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { HumanAvatar } from "@/components/HumanAvatar";
 import { sendMessage } from "../actions";
 
 type Msg = {
@@ -16,11 +18,15 @@ export function ChatThreadClient({
   meId,
   otherId,
   otherUsername,
+  otherDisplayName,
+  otherAvatarUrl,
   initialMessages,
 }: {
   meId: string;
   otherId: string;
   otherUsername: string;
+  otherDisplayName: string | null;
+  otherAvatarUrl: string | null;
   initialMessages: Msg[];
 }) {
   const [messages, setMessages] = useState<Msg[]>(initialMessages);
@@ -115,38 +121,79 @@ export function ChatThreadClient({
     <>
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto px-4 py-4 space-y-3"
-        style={{ maxHeight: "calc(100vh - 240px)" }}
+        className="flex-1 space-y-3 overflow-y-auto px-4 py-5"
+        style={{ maxHeight: "calc(100vh - 230px)" }}
       >
         {messages.length === 0 ? (
-          <p className="text-center text-ink-soft text-sm font-serif py-10">
-            첫 메시지를 보내보세요.
-          </p>
+          <div className="mx-auto max-w-sm border border-line bg-bg-card px-6 py-10 text-center">
+            <div className="mx-auto mb-4 grid h-12 w-12 place-items-center border border-line bg-bg text-ink-soft">
+              <ShieldCheck size={20} />
+            </div>
+            <p className="font-serif text-lg text-ink">첫 메시지를 보내보세요</p>
+            <p className="mt-2 font-serif text-sm leading-relaxed text-ink-soft">
+              NOai의 대화는 관계를 만들기 위한 공간입니다.
+            </p>
+          </div>
         ) : (
-          messages.map((m) => {
+          messages.map((m, index) => {
             const mine = m.sender_id === meId;
+            const previous = messages[index - 1];
+            const next = messages[index + 1];
+            const showDate =
+              !previous || !isSameDay(previous.created_at, m.created_at);
+            const groupedWithPrevious =
+              !!previous &&
+              previous.sender_id === m.sender_id &&
+              isSameDay(previous.created_at, m.created_at);
+            const showAvatar = !mine && !groupedWithPrevious;
+            const showRead = mine && (!next || next.sender_id !== meId);
+
             return (
-              <div
-                key={m.id}
-                className={`flex ${mine ? "justify-end" : "justify-start"}`}
-              >
+              <div key={m.id} className="space-y-3">
+                {showDate && (
+                  <div className="flex justify-center">
+                    <span className="border border-line bg-bg-card px-2 py-1 font-sans text-[11px] text-ink-faint">
+                      {formatDateLabel(m.created_at)}
+                    </span>
+                  </div>
+                )}
                 <div
-                  className={`max-w-[75%] px-3 py-2 font-serif text-sm whitespace-pre-wrap break-words ${
-                    mine
-                      ? "bg-ink text-bg rounded-l-lg rounded-tr-lg"
-                      : "bg-bg-card border border-line rounded-r-lg rounded-tl-lg"
+                  className={`flex items-end gap-2 ${
+                    mine ? "justify-end" : "justify-start"
                   }`}
                 >
-                  {m.body}
+                  {!mine && (
+                    <div className="w-10 shrink-0">
+                      {showAvatar && (
+                        <HumanAvatar
+                          username={otherUsername}
+                          avatarUrl={otherAvatarUrl}
+                          size="sm"
+                        />
+                      )}
+                    </div>
+                  )}
                   <div
-                    className={`text-[10px] mt-1 font-sans ${
-                      mine ? "text-bg/60" : "text-ink-faint"
-                    }`}
+                    className={`max-w-[75%] px-3 py-2 font-serif text-sm whitespace-pre-wrap break-words ${
+                      mine
+                        ? "bg-ink text-bg rounded-l-lg rounded-tr-lg"
+                        : "bg-bg-card border border-line rounded-r-lg rounded-tl-lg"
+                    } ${groupedWithPrevious ? "mt-[-6px]" : ""}`}
                   >
-                    {new Date(m.created_at).toLocaleTimeString("ko-KR", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
+                    {!mine && showAvatar && (
+                      <div className="mb-1 font-sans text-[11px] text-ink-faint">
+                        {otherDisplayName || `@${otherUsername}`}
+                      </div>
+                    )}
+                    {m.body}
+                    <div
+                      className={`mt-1 flex items-center justify-end gap-1 font-sans text-[10px] ${
+                        mine ? "text-bg/60" : "text-ink-faint"
+                      }`}
+                    >
+                      {showRead && m.read && <CheckCheck size={12} />}
+                      <span>{formatTime(m.created_at)}</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -157,7 +204,7 @@ export function ChatThreadClient({
 
       <form
         onSubmit={handleSend}
-        className="sticky bottom-0 bg-bg border-t border-line px-3 py-3 flex gap-2"
+        className="sticky bottom-0 grid grid-cols-[1fr_auto] gap-2 border-t border-line bg-bg/95 px-3 py-3 backdrop-blur"
       >
         <input
           type="text"
@@ -165,23 +212,49 @@ export function ChatThreadClient({
           onChange={(e) => setBody(e.target.value)}
           placeholder="메시지 입력 (직접 타이핑하세요)"
           maxLength={1000}
-          className="flex-1 px-3 py-2 bg-bg-card border border-line focus:border-ink outline-none font-serif text-sm"
+          className="min-w-0 border border-line bg-bg-card px-3 py-2 font-serif text-sm outline-none transition-colors focus:border-ink"
           disabled={sending}
         />
         <button
           type="submit"
           disabled={sending || !body.trim()}
-          className="px-4 py-2 bg-ink text-bg hover:bg-ink-soft disabled:opacity-40 transition-colors font-serif text-sm"
+          className="grid h-10 w-10 place-items-center bg-ink text-bg transition-colors hover:bg-ink-soft disabled:opacity-40"
+          aria-label="메시지 보내기"
         >
-          {sending ? "..." : "보내기"}
+          <Send size={16} />
         </button>
       </form>
 
       {error && (
         <p className="text-xs text-warn text-center pb-2 font-serif">
-          ⚠ {error}
+          {error}
         </p>
       )}
     </>
   );
+}
+
+function isSameDay(a: string, b: string): boolean {
+  const da = new Date(a);
+  const db = new Date(b);
+  return (
+    da.getFullYear() === db.getFullYear() &&
+    da.getMonth() === db.getMonth() &&
+    da.getDate() === db.getDate()
+  );
+}
+
+function formatDateLabel(iso: string): string {
+  return new Date(iso).toLocaleDateString("ko-KR", {
+    month: "long",
+    day: "numeric",
+    weekday: "short",
+  });
+}
+
+function formatTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString("ko-KR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }

@@ -112,6 +112,39 @@ export async function toggleReaction(postId: string): Promise<ActionResult> {
   return { ok: true };
 }
 
+export async function toggleSave(postId: string): Promise<ActionResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "로그인이 필요합니다" };
+
+  const { data: existing } = await supabase
+    .from("saved_posts")
+    .select("post_id")
+    .eq("user_id", user.id)
+    .eq("post_id", postId)
+    .maybeSingle();
+
+  if (existing) {
+    const { error } = await supabase
+      .from("saved_posts")
+      .delete()
+      .eq("user_id", user.id)
+      .eq("post_id", postId);
+    if (error) return { error: error.message };
+  } else {
+    const { error } = await supabase
+      .from("saved_posts")
+      .insert({ user_id: user.id, post_id: postId });
+    if (error) return { error: error.message };
+  }
+
+  revalidatePath(`/post/${postId}`);
+  revalidatePath("/saved");
+  return { ok: true };
+}
+
 export async function addComment(
   postId: string,
   body: string,

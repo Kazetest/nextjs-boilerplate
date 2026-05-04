@@ -55,6 +55,9 @@ export default async function DebugPage() {
       "user_strikes",
       "messages",
       "notifications",
+      "stories",
+      "story_views",
+      "saved_posts",
     ].map((t) => probeTable(supabase, t))
   );
 

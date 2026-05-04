@@ -10,7 +10,10 @@ export type AICheckResult = {
 
 const AI_THRESHOLD = 0.6;
 
-export async function detectAIImage(file: File): Promise<AICheckResult> {
+export async function detectAIImage(
+  file: Blob,
+  filename = "image.jpg"
+): Promise<AICheckResult> {
   const apiUser = process.env.SIGHTENGINE_API_USER;
   const apiSecret = process.env.SIGHTENGINE_API_SECRET;
 
@@ -20,7 +23,7 @@ export async function detectAIImage(file: File): Promise<AICheckResult> {
 
   try {
     const fd = new FormData();
-    fd.append("media", file);
+    fd.append("media", file, filename);
     fd.append("models", "genai");
     fd.append("api_user", apiUser);
     fd.append("api_secret", apiSecret);

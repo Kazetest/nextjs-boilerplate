@@ -24,7 +24,7 @@ export default async function TagPage({
     .from("posts")
     .select(
       `id, image_url, caption, origin_type, origin_creator_username, origin_label, exif_data, created_at,
-       author:profiles!posts_author_id_fkey(username, display_name)`
+       author:profiles!posts_author_id_fkey(username, display_name, avatar_url)`
     )
     .ilike("caption", `%#${tag}%`)
     .eq("hidden_by_reports", false)

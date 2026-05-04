@@ -3,6 +3,16 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import type { ComponentType } from "react";
+import {
+  Bell,
+  Bookmark,
+  Compass,
+  Home,
+  MessageCircle,
+  PlusSquare,
+  User,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 const NAV_HIDDEN_PATHS = ["/login", "/onboarding", "/auth", "/legal"];
@@ -66,44 +76,84 @@ export function GlobalNav() {
             NOai
           </Link>
           <nav className="hidden sm:flex items-center gap-5 text-sm font-serif">
-            <NavLink href="/feed" label="피드" current={pathname} />
-            <NavLink href="/explore" label="탐색" current={pathname} />
-            <NavLink href="/create" label="+ 새 글" current={pathname} />
+            <NavLink href="/feed" label="피드" current={pathname} icon={Home} />
+            <NavLink
+              href="/explore"
+              label="탐색"
+              current={pathname}
+              icon={Compass}
+            />
+            <NavLink
+              href="/create"
+              label="새 글"
+              current={pathname}
+              icon={PlusSquare}
+            />
             <NavLink
               href="/notifications"
               label="알림"
               current={pathname}
               badge={unreadNotif}
+              icon={Bell}
             />
             <NavLink
               href="/chat"
               label="채팅"
               current={pathname}
               badge={unread}
+              icon={MessageCircle}
             />
-            <NavLink href="/profile/me" label="나" current={pathname} />
+            <NavLink
+              href="/saved"
+              label="저장"
+              current={pathname}
+              icon={Bookmark}
+            />
+            <NavLink
+              href="/profile/me"
+              label="나"
+              current={pathname}
+              icon={User}
+            />
           </nav>
         </div>
       </header>
 
       <nav className="sm:hidden fixed bottom-0 inset-x-0 z-30 bg-bg/95 backdrop-blur border-t border-line">
         <div className="max-w-xl mx-auto grid grid-cols-6 text-xs font-serif">
-          <BottomTab href="/feed" label="피드" current={pathname} />
-          <BottomTab href="/explore" label="탐색" current={pathname} />
-          <BottomTab href="/create" label="＋" current={pathname} />
+          <BottomTab href="/feed" label="피드" current={pathname} icon={Home} />
+          <BottomTab
+            href="/explore"
+            label="탐색"
+            current={pathname}
+            icon={Compass}
+          />
+          <BottomTab
+            href="/create"
+            label="작성"
+            current={pathname}
+            icon={PlusSquare}
+          />
           <BottomTab
             href="/notifications"
             label="알림"
             current={pathname}
             badge={unreadNotif}
+            icon={Bell}
           />
           <BottomTab
             href="/chat"
             label="채팅"
             current={pathname}
             badge={unread}
+            icon={MessageCircle}
           />
-          <BottomTab href="/profile/me" label="나" current={pathname} />
+          <BottomTab
+            href="/profile/me"
+            label="나"
+            current={pathname}
+            icon={User}
+          />
         </div>
       </nav>
     </>
@@ -115,20 +165,23 @@ function NavLink({
   label,
   current,
   badge = 0,
+  icon: Icon,
 }: {
   href: string;
   label: string;
   current: string;
   badge?: number;
+  icon: ComponentType<{ size?: number; strokeWidth?: number }>;
 }) {
   const active = current === href || current.startsWith(href + "/");
   return (
     <Link
       href={href}
-      className={`relative transition-colors ${
+      className={`relative inline-flex items-center gap-1.5 transition-colors ${
         active ? "text-ink" : "text-ink-soft hover:text-ink"
       }`}
     >
+      <Icon size={16} strokeWidth={active ? 2.4 : 1.8} />
       {label}
       {badge > 0 && (
         <span className="absolute -top-2 -right-3 min-w-[16px] h-4 px-1 rounded-full bg-ink text-bg text-[10px] flex items-center justify-center font-sans">
@@ -144,11 +197,13 @@ function BottomTab({
   label,
   current,
   badge = 0,
+  icon: Icon,
 }: {
   href: string;
   label: string;
   current: string;
   badge?: number;
+  icon: ComponentType<{ size?: number; strokeWidth?: number }>;
 }) {
   const active = current === href || current.startsWith(href + "/");
   return (
@@ -158,7 +213,8 @@ function BottomTab({
         active ? "text-ink" : "text-ink-soft hover:text-ink"
       }`}
     >
-      <span>{label}</span>
+      <Icon size={21} strokeWidth={active ? 2.4 : 1.8} />
+      <span className="mt-0.5 font-sans text-[10px]">{label}</span>
       {badge > 0 && (
         <span className="absolute top-1 right-1/4 min-w-[16px] h-4 px-1 rounded-full bg-ink text-bg text-[10px] flex items-center justify-center font-sans">
           {badge > 99 ? "99+" : badge}

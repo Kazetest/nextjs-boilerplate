@@ -1,5 +1,6 @@
 "use client";
 
+import { HandHeart } from "lucide-react";
 import { useState, useTransition } from "react";
 import { toggleReaction } from "@/app/post/actions";
 
@@ -31,15 +32,17 @@ export function ReactionButton({
 
   return (
     <button
+      type="button"
       onClick={handle}
-      className={`flex items-center gap-2 text-sm font-serif transition-colors ${
-        reacted ? "text-ink" : "text-ink-faint hover:text-ink"
+      className={`inline-flex h-10 items-center gap-2 px-3 font-sans text-sm transition-colors disabled:opacity-50 ${
+        reacted ? "text-ink" : "text-ink-soft hover:text-ink"
       }`}
+      aria-pressed={reacted}
+      aria-label={reacted ? "묵례 취소" : "묵례"}
     >
-      <span className={`text-lg ${reacted ? "" : "grayscale opacity-60"}`}>
-        🙇
-      </span>
-      <span className="tabular-nums">{count} 묵례</span>
+      <HandHeart size={20} fill={reacted ? "currentColor" : "none"} />
+      <span className="tabular-nums">{count}</span>
+      <span>묵례</span>
     </button>
   );
 }

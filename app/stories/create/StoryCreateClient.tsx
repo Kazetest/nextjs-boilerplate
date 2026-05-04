@@ -1,0 +1,249 @@
+"use client";
+
+import Link from "next/link";
+import { useState } from "react";
+import {
+  Camera as CameraIcon,
+  CircleCheck,
+  CircleDashed,
+  Clock3,
+  Keyboard,
+  Send,
+  ShieldCheck,
+  TriangleAlert,
+  X,
+} from "lucide-react";
+import { Camera as HumanCamera } from "@/components/Camera";
+import { CaptionEditor } from "@/components/CaptionEditor";
+import { createStory } from "../actions";
+import type { ExifResult } from "@/lib/exif";
+import type { KeystrokeRecord } from "@/lib/keystroke";
+
+export function StoryCreateClient() {
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [exif, setExif] = useState<ExifResult | null>(null);
+  const [caption, setCaption] = useState("");
+  const [keystrokes, setKeystrokes] = useState<KeystrokeRecord | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const captionReady = isStoryCaptionReady(caption, keystrokes);
+  const canSubmit = !!imageFile && captionReady && !submitting;
+
+  async function handleSubmit() {
+    if (!imageFile || !captionReady || submitting) return;
+    setSubmitting(true);
+    setError(null);
+
+    const fd = new FormData();
+    fd.append("image", imageFile);
+    fd.append("caption", caption);
+    fd.append("keystrokes", JSON.stringify(keystrokes ?? { strokes: [] }));
+    fd.append("exif", JSON.stringify(exif?.data ?? {}));
+
+    try {
+      const result = await createStory(fd);
+      if (result?.error) {
+        setError(result.error);
+        setSubmitting(false);
+      }
+    } catch (e) {
+      const digest = (e as { digest?: string })?.digest;
+      if (typeof digest === "string" && digest.startsWith("NEXT_REDIRECT")) {
+        throw e;
+      }
+      setError(e instanceof Error ? e.message : "스토리 업로드 실패");
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <main className="relative z-10 mx-auto flex w-full max-w-md flex-1 flex-col px-4 py-5">
+      <header className="mb-5 flex items-center justify-between">
+        <Link
+          href="/feed"
+          className="grid h-10 w-10 place-items-center rounded-full border border-line bg-bg-card text-ink-soft transition-colors hover:text-ink"
+          aria-label="닫기"
+        >
+          <X size={18} />
+        </Link>
+        <div className="text-center">
+          <p className="font-sans text-[10px] font-medium uppercase tracking-[0.26em] text-ink-faint">
+            24h Story
+          </p>
+          <h1 className="font-serif text-2xl">오늘의 인간 순간</h1>
+        </div>
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={!canSubmit}
+          className="grid h-10 w-10 place-items-center rounded-full bg-ink text-bg transition-colors hover:bg-ink-soft disabled:opacity-35"
+          aria-label="스토리 올리기"
+        >
+          <Send size={17} />
+        </button>
+      </header>
+
+      <StoryProofPanel
+        imageFile={imageFile}
+        exif={exif}
+        caption={caption}
+        keystrokes={keystrokes}
+      />
+
+      <div className="overflow-hidden rounded-lg border border-line bg-bg-card shadow-[0_18px_60px_rgba(26,26,26,0.08)]">
+        <div className="border-b border-line px-4 py-3">
+          <div className="flex items-center gap-2 text-sm text-ink-soft">
+            <CameraIcon size={16} />
+            <span className="font-serif">사진은 남고, 스토리는 24시간만.</span>
+          </div>
+        </div>
+        <div className="p-3">
+          <HumanCamera
+            onImageCaptured={(file, nextExif) => {
+              setImageFile(file);
+              setExif(nextExif);
+            }}
+          />
+        </div>
+      </div>
+
+      <div className="mt-5 rounded-lg border border-line bg-bg-card p-4">
+        <CaptionEditor
+          value={caption}
+          onChange={setCaption}
+          onRecordChange={setKeystrokes}
+          maxLength={180}
+          minHeight="min-h-24"
+          placeholder="짧게 직접 써주세요."
+        />
+      </div>
+
+      {error && (
+        <div className="mt-4 rounded-lg border border-warn/40 bg-warn/5 px-4 py-3 font-serif text-sm leading-relaxed text-warn">
+          {error}
+        </div>
+      )}
+    </main>
+  );
+}
+
+function StoryProofPanel({
+  imageFile,
+  exif,
+  caption,
+  keystrokes,
+}: {
+  imageFile: File | null;
+  exif: ExifResult | null;
+  caption: string;
+  keystrokes: KeystrokeRecord | null;
+}) {
+  const imageReady = !!imageFile;
+  const freshCapture = !!exif?.data.dateTimeOriginal;
+  const captionReady = isStoryCaptionReady(caption, keystrokes);
+  const readyCount = [imageReady, captionReady, true].filter(Boolean).length;
+
+  return (
+    <section className="mb-5 border border-line bg-bg-card">
+      <div className="flex items-center justify-between gap-4 border-b border-line px-4 py-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <ShieldCheck size={17} className="shrink-0 text-ink-soft" />
+          <div className="min-w-0">
+            <h2 className="truncate font-sans text-sm font-medium text-ink">
+              Story proof
+            </h2>
+            <p className="font-serif text-xs text-ink-faint">
+              {readyCount}/3 준비됨
+            </p>
+          </div>
+        </div>
+        <span
+          className={`inline-flex items-center gap-1 border px-2 py-1 font-sans text-[11px] ${
+            imageReady && captionReady
+              ? "border-ink text-ink"
+              : "border-line text-ink-faint"
+          }`}
+        >
+          {imageReady && captionReady ? (
+            <CircleCheck size={13} />
+          ) : (
+            <CircleDashed size={13} />
+          )}
+          {imageReady && captionReady ? "올릴 수 있음" : "진행 중"}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-3 divide-x divide-line">
+        <ProofItem
+          icon={<CameraIcon size={15} />}
+          label="사진"
+          state={imageReady ? (freshCapture ? "직촬" : "확인") : "대기"}
+          complete={imageReady}
+          caution={imageReady && !freshCapture}
+        />
+        <ProofItem
+          icon={<Keyboard size={15} />}
+          label="문장"
+          state={!caption.trim() ? "선택" : captionReady ? "직타" : "대기"}
+          complete={captionReady}
+        />
+        <ProofItem
+          icon={<Clock3 size={15} />}
+          label="수명"
+          state="24h"
+          complete
+        />
+      </div>
+    </section>
+  );
+}
+
+function ProofItem({
+  icon,
+  label,
+  state,
+  complete,
+  caution = false,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  state: string;
+  complete: boolean;
+  caution?: boolean;
+}) {
+  return (
+    <div className="min-w-0 px-3 py-3">
+      <div className="mb-2 flex items-center gap-1 font-sans text-[11px] text-ink-faint">
+        {icon}
+        {label}
+      </div>
+      <div
+        className={`flex items-center gap-1 font-sans text-sm font-medium ${
+          complete ? "text-ink" : "text-ink-faint"
+        }`}
+      >
+        {caution ? (
+          <TriangleAlert size={14} />
+        ) : complete ? (
+          <CircleCheck size={14} />
+        ) : (
+          <CircleDashed size={14} />
+        )}
+        <span className="truncate">{state}</span>
+      </div>
+    </div>
+  );
+}
+
+function isStoryCaptionReady(
+  caption: string,
+  keystrokes: KeystrokeRecord | null
+): boolean {
+  const trimmed = caption.trim();
+  if (!trimmed) return true;
+  return (
+    !!keystrokes &&
+    keystrokes.strokes.length >= Math.max(2, trimmed.length * 0.35) &&
+    keystrokes.durationMs >= trimmed.length * 18
+  );
+}

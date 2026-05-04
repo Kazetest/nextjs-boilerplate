@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { Camera, Clock3 } from "lucide-react";
 import { tokenizeCaption } from "@/lib/hashtag";
 import { PostMenu } from "@/components/PostMenu";
+import { HumanAvatar } from "@/components/HumanAvatar";
 
 export type PostRow = {
   id: string;
@@ -11,12 +13,14 @@ export type PostRow = {
   origin_creator_username: string | null;
   origin_label: string | null;
   exif_data: Record<string, unknown> | null;
+  ai_score?: number | null;
   hidden_by_reports?: boolean;
   report_count?: number;
   created_at: string;
   author: {
     username: string;
     display_name: string | null;
+    avatar_url?: string | null;
   } | null;
 };
 
@@ -70,14 +74,24 @@ export function PostCard({
       <header className="px-4 py-3 flex items-center justify-between border-b border-line">
         <Link
           href={`/profile/${post.author?.username ?? "unknown"}`}
-          className="font-serif text-sm text-ink hover:underline underline-offset-4"
+          className="flex min-w-0 items-center gap-3"
         >
-          @{post.author?.username ?? "unknown"}
+          <HumanAvatar
+            username={post.author?.username ?? "??"}
+            avatarUrl={post.author?.avatar_url}
+            size="sm"
+          />
+          <span className="min-w-0">
+            <span className="block truncate font-sans text-sm font-medium">
+              @{post.author?.username ?? "unknown"}
+            </span>
+            <span className="flex items-center gap-1 truncate font-serif text-[11px] text-ink-faint">
+              <Clock3 size={11} />
+              {timeAgo(post.created_at)}
+            </span>
+          </span>
         </Link>
         <div className="flex items-center gap-3">
-          <span className="text-xs text-ink-faint">
-            {timeAgo(post.created_at)}
-          </span>
           {post.author_id && (
             <PostMenu
               postId={post.id}
@@ -111,11 +125,19 @@ export function PostCard({
         )}
       </Link>
 
-      <div className="px-4 py-3 space-y-2">
+      <div className="px-4 py-3 space-y-3">
+        <div className="flex flex-wrap items-center gap-2">
+          {fresh && (
+            <span className="inline-flex items-center gap-1 border border-line bg-bg px-2 py-1 font-sans text-[11px] text-ink-soft">
+              <Camera size={12} />
+              직촬
+            </span>
+          )}
+          <OriginBadge post={post} />
+        </div>
         <p className="font-serif text-base leading-relaxed text-ink whitespace-pre-wrap">
           <CaptionWithTags text={post.caption} />
         </p>
-        <OriginBadge post={post} />
       </div>
     </article>
   );

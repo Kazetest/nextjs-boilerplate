@@ -37,6 +37,14 @@ export function AuthenticityCard({ post }: { post: PostRow }) {
         label="게시 시각"
         value={new Date(post.created_at).toLocaleString("ko-KR")}
       />
+      <Row
+        label="AI 검사"
+        value={
+          typeof post.ai_score === "number"
+            ? `${Math.round(post.ai_score * 100)}%`
+            : "(대기 또는 비활성)"
+        }
+      />
     </div>
   );
 }

@@ -24,7 +24,7 @@ export default async function TrendPage({
     .from("posts")
     .select(
       `id, author_id, image_url, caption, origin_type, origin_post_id, origin_creator_username, origin_label, exif_data, hidden_by_reports, created_at,
-       author:profiles!posts_author_id_fkey(username, display_name)`
+       author:profiles!posts_author_id_fkey(username, display_name, avatar_url)`
     )
     .eq("id", postId)
     .maybeSingle();
@@ -38,7 +38,7 @@ export default async function TrendPage({
       .from("posts")
       .select(
         `id, author_id, image_url, caption, origin_type, origin_post_id, origin_creator_username, origin_label, exif_data, hidden_by_reports, created_at,
-         author:profiles!posts_author_id_fkey(username, display_name)`
+         author:profiles!posts_author_id_fkey(username, display_name, avatar_url)`
       )
       .eq("id", thisPost.origin_post_id)
       .maybeSingle();
@@ -50,7 +50,7 @@ export default async function TrendPage({
     .from("posts")
     .select(
       `id, author_id, image_url, caption, origin_type, origin_post_id, origin_creator_username, origin_label, exif_data, hidden_by_reports, created_at,
-       author:profiles!posts_author_id_fkey(username, display_name)`
+       author:profiles!posts_author_id_fkey(username, display_name, avatar_url)`
     )
     .eq("origin_post_id", originPost.id)
     .eq("hidden_by_reports", false);

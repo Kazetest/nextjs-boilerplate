@@ -1,6 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import {
+  Camera as CameraIcon,
+  CircleCheck,
+  CircleDashed,
+  FileCheck,
+  Keyboard,
+  ShieldCheck,
+  TriangleAlert,
+} from "lucide-react";
 import { Camera } from "@/components/Camera";
 import { CaptionEditor } from "@/components/CaptionEditor";
 import { OriginPicker, type Origin } from "@/components/OriginPicker";
@@ -78,6 +87,13 @@ export default function CreateClient() {
   return (
     <main className="max-w-lg mx-auto px-4 py-8 w-full relative z-10">
       <Stepper current={step} />
+      <AuthenticityChecklist
+        imageFile={imageFile}
+        exif={exif}
+        caption={caption}
+        keystrokes={keystrokes}
+        origin={origin}
+      />
 
       {step === 1 && (
         <div className="space-y-6">
@@ -226,4 +242,130 @@ function Stepper({ current }: { current: number }) {
       </div>
     </div>
   );
+}
+
+function AuthenticityChecklist({
+  imageFile,
+  exif,
+  caption,
+  keystrokes,
+  origin,
+}: {
+  imageFile: File | null;
+  exif: ExifResult | null;
+  caption: string;
+  keystrokes: KeystrokeRecord | null;
+  origin: Origin;
+}) {
+  const trimmedCaption = caption.trim();
+  const imageReady = !!imageFile;
+  const freshCapture = !!exif?.data.dateTimeOriginal;
+  const captionReady =
+    !!keystrokes &&
+    trimmedCaption.length > 0 &&
+    keystrokes.strokes.length >= Math.max(3, trimmedCaption.length * 0.4) &&
+    keystrokes.durationMs >= trimmedCaption.length * 20;
+  const originReady =
+    origin.type === "original" ||
+    origin.type === "overseas_meme" ||
+    !!origin.creatorUsername?.trim();
+  const readyCount = [imageReady, captionReady, originReady].filter(Boolean)
+    .length;
+
+  return (
+    <section className="mb-8 border border-line bg-bg-card">
+      <div className="flex items-center justify-between gap-4 border-b border-line px-4 py-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <ShieldCheck size={17} className="shrink-0 text-ink-soft" />
+          <div className="min-w-0">
+            <h2 className="truncate font-sans text-sm font-medium text-ink">
+              Human proof
+            </h2>
+            <p className="font-serif text-xs text-ink-faint">
+              {readyCount}/3 준비됨
+            </p>
+          </div>
+        </div>
+        <span
+          className={`inline-flex items-center gap-1 border px-2 py-1 font-sans text-[11px] ${
+            readyCount === 3
+              ? "border-ink text-ink"
+              : "border-line text-ink-faint"
+          }`}
+        >
+          {readyCount === 3 ? (
+            <CircleCheck size={13} />
+          ) : (
+            <CircleDashed size={13} />
+          )}
+          {readyCount === 3 ? "게시 가능" : "진행 중"}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-3 divide-x divide-line">
+        <ProofItem
+          icon={<CameraIcon size={15} />}
+          label="사진"
+          state={imageReady ? (freshCapture ? "직촬" : "확인") : "대기"}
+          complete={imageReady}
+          caution={imageReady && !freshCapture}
+        />
+        <ProofItem
+          icon={<Keyboard size={15} />}
+          label="캡션"
+          state={captionReady ? "직타" : "대기"}
+          complete={captionReady}
+        />
+        <ProofItem
+          icon={<FileCheck size={15} />}
+          label="출처"
+          state={originLabel(origin)}
+          complete={originReady}
+        />
+      </div>
+    </section>
+  );
+}
+
+function ProofItem({
+  icon,
+  label,
+  state,
+  complete,
+  caution = false,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  state: string;
+  complete: boolean;
+  caution?: boolean;
+}) {
+  return (
+    <div className="min-w-0 px-3 py-3">
+      <div className="mb-2 flex items-center gap-1 font-sans text-[11px] text-ink-faint">
+        {icon}
+        {label}
+      </div>
+      <div
+        className={`flex items-center gap-1 font-sans text-sm font-medium ${
+          complete ? "text-ink" : "text-ink-faint"
+        }`}
+      >
+        {caution ? (
+          <TriangleAlert size={14} />
+        ) : complete ? (
+          <CircleCheck size={14} />
+        ) : (
+          <CircleDashed size={14} />
+        )}
+        <span className="truncate">{state}</span>
+      </div>
+    </div>
+  );
+}
+
+function originLabel(origin: Origin): string {
+  if (origin.type === "original") return "원본";
+  if (origin.type === "overseas_meme") return "밈";
+  return origin.creatorUsername?.trim() ? "멘션" : "대기";
 }

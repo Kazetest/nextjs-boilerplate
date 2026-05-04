@@ -1,30 +1,34 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={<LoginForm callbackError={null} />}>
+      <LoginPageInner />
+    </Suspense>
+  );
+}
+
+function LoginPageInner() {
+  const searchParams = useSearchParams();
+  const callbackError = formatCallbackError(
+    searchParams.get("error"),
+    searchParams.get("detail")
+  );
+
+  return <LoginForm callbackError={callbackError} />;
+}
+
+function LoginForm({ callbackError }: { callbackError: string | null }) {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState<"google" | "magic" | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  // OAuth callback 실패 시 ?error=...&detail=... 로 돌아오면 화면에 노출
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const sp = new URLSearchParams(window.location.search);
-    const e = sp.get("error");
-    const detail = sp.get("detail");
-    if (e) {
-      const map: Record<string, string> = {
-        callback_failed: "OAuth callback 실패",
-        no_code: "OAuth code 없음 — Supabase URL Configuration 확인",
-        profile_create_failed: "프로필 생성 실패",
-      };
-      setError(`${map[e] ?? e}${detail ? `: ${decodeURIComponent(detail)}` : ""}`);
-    }
-  }, []);
+  const displayError = error ?? callbackError;
 
   async function handleGoogle() {
     setLoading("google");
@@ -127,12 +131,12 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {error && (
+          {displayError && (
             <div className="mt-5 px-4 py-3 border border-warn/40 bg-warn/5 text-warn text-sm font-serif leading-relaxed">
               <span className="block mb-0.5 text-[10px] tracking-[0.3em] uppercase opacity-70">
                 Error
               </span>
-              {error}
+              {displayError}
             </div>
           )}
 
@@ -162,6 +166,17 @@ export default function LoginPage() {
       )}
     </main>
   );
+}
+
+function formatCallbackError(error: string | null, detail: string | null) {
+  if (!error) return null;
+  const map: Record<string, string> = {
+    callback_failed: "OAuth callback 실패",
+    env_missing: "Supabase 환경변수 없음",
+    no_code: "OAuth code 없음 — Supabase URL Configuration 확인",
+    profile_create_failed: "프로필 생성 실패",
+  };
+  return `${map[error] ?? error}${detail ? `: ${detail}` : ""}`;
 }
 
 function GoogleIcon() {

@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
+import { HumanAvatar } from "@/components/HumanAvatar";
 import { ChatThreadClient } from "./ChatThreadClient";
 
 export const dynamic = "force-dynamic";
@@ -21,7 +23,7 @@ export default async function ChatThreadPage({
 
   const { data: other } = await supabase
     .from("profiles")
-    .select("id, username, display_name")
+    .select("id, username, display_name, avatar_url")
     .eq("username", cleaned)
     .maybeSingle();
 
@@ -46,24 +48,42 @@ export default async function ChatThreadPage({
     .eq("read", false);
 
   return (
-    <main className="max-w-xl mx-auto w-full flex flex-col flex-1 relative z-10">
-      <div className="sticky top-14 z-20 bg-bg/80 backdrop-blur border-b border-line px-4 py-3 flex items-center justify-between">
+    <main className="relative z-10 mx-auto flex w-full max-w-2xl flex-1 flex-col">
+      <div className="sticky top-14 z-20 flex items-center justify-between border-b border-line bg-bg/90 px-4 py-3 backdrop-blur">
+        <div className="flex min-w-0 items-center gap-3">
+          <Link
+            href="/chat"
+            className="grid h-9 w-9 place-items-center border border-line bg-bg-card text-ink-soft transition-colors hover:text-ink"
+            aria-label="대화 목록"
+          >
+            <ArrowLeft size={17} />
+          </Link>
+          <Link
+            href={`/profile/${other.username}`}
+            className="flex min-w-0 items-center gap-3"
+          >
+            <HumanAvatar
+              username={other.username}
+              avatarUrl={other.avatar_url}
+              size="sm"
+            />
+            <span className="min-w-0">
+              <span className="block truncate font-sans text-sm font-medium">
+                @{other.username}
+              </span>
+              {other.display_name && (
+                <span className="block truncate font-serif text-xs text-ink-faint">
+                  {other.display_name}
+                </span>
+              )}
+            </span>
+          </Link>
+        </div>
         <Link
           href={`/profile/${other.username}`}
-          className="font-serif text-base"
+          className="font-sans text-xs text-ink-soft transition-colors hover:text-ink"
         >
-          @{other.username}
-          {other.display_name && (
-            <span className="ml-2 text-xs text-ink-faint">
-              {other.display_name}
-            </span>
-          )}
-        </Link>
-        <Link
-          href="/chat"
-          className="text-xs text-ink-soft hover:text-ink font-serif"
-        >
-          ← 목록
+          프로필
         </Link>
       </div>
 
@@ -71,6 +91,8 @@ export default async function ChatThreadPage({
         meId={user.id}
         otherId={other.id}
         otherUsername={other.username}
+        otherDisplayName={other.display_name}
+        otherAvatarUrl={other.avatar_url}
         initialMessages={
           (messages ?? []) as {
             id: string;
