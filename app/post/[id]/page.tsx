@@ -93,7 +93,11 @@ export default async function PostPage({
       </header>
 
       <main className="max-w-xl mx-auto px-4 py-6 w-full space-y-8">
-        <PostCard post={post as unknown as PostRow} currentUserId={user.id} />
+        <PostCard
+          post={post as unknown as PostRow}
+          currentUserId={user.id}
+          showFeedActions={false}
+        />
 
         <PostActionBar
           postId={id}

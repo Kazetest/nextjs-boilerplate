@@ -1,9 +1,11 @@
 import Link from "next/link";
-import { Camera, Clock3, HandHeart, MessageCircle } from "lucide-react";
+import { Camera, Clock3, MessageCircle } from "lucide-react";
 import { tokenizeCaption } from "@/lib/hashtag";
 import { PostMenu } from "@/components/PostMenu";
 import { HumanAvatar } from "@/components/HumanAvatar";
 import { ShareButton } from "@/components/ShareButton";
+import { ReactionButton } from "@/components/ReactionButton";
+import { SaveButton } from "@/components/SaveButton";
 
 export type PostRow = {
   id: string;
@@ -17,6 +19,10 @@ export type PostRow = {
   ai_score?: number | null;
   hidden_by_reports?: boolean;
   report_count?: number;
+  reaction_count?: number;
+  comment_count?: number;
+  reacted_by_me?: boolean;
+  saved_by_me?: boolean;
   created_at: string;
   author: {
     username: string;
@@ -52,9 +58,11 @@ function isFreshlyCaptured(post: PostRow): boolean {
 export function PostCard({
   post,
   currentUserId,
+  showFeedActions = true,
 }: {
   post: PostRow;
   currentUserId?: string;
+  showFeedActions?: boolean;
 }) {
   const fresh = isFreshlyCaptured(post);
   const isOwn = !!currentUserId && currentUserId === post.author_id;
@@ -127,7 +135,7 @@ export function PostCard({
       </Link>
 
       <div className="px-4 py-3 space-y-3">
-        <PostFeedActions post={post} />
+        {showFeedActions && <PostFeedActions post={post} />}
         <div className="flex flex-wrap items-center gap-2">
           {fresh && (
             <span className="inline-flex items-center gap-1 border border-line bg-bg px-2 py-1 font-sans text-[11px] text-ink-soft">
@@ -148,20 +156,19 @@ export function PostCard({
 function PostFeedActions({ post }: { post: PostRow }) {
   const authorUsername = post.author?.username ?? null;
   return (
-    <div className="flex items-center justify-between border-b border-line pb-3">
+    <div className="flex items-center justify-between gap-1 border-b border-line pb-3">
       <div className="flex min-w-0 items-center gap-1">
-        <Link
-          href={`/post/${post.id}`}
-          className="inline-flex h-9 items-center gap-2 px-2 font-sans text-sm text-ink-soft transition-colors hover:text-ink"
-        >
-          <HandHeart size={19} />
-          묵례
-        </Link>
+        <ReactionButton
+          postId={post.id}
+          initialReacted={!!post.reacted_by_me}
+          initialCount={post.reaction_count ?? 0}
+        />
         <Link
           href={`/post/${post.id}#comments`}
-          className="inline-flex h-9 items-center gap-2 px-2 font-sans text-sm text-ink-soft transition-colors hover:text-ink"
+          className="inline-flex h-10 items-center gap-2 px-3 font-sans text-sm text-ink-soft transition-colors hover:text-ink"
         >
-          <MessageCircle size={19} />
+          <MessageCircle size={20} />
+          <span className="tabular-nums">{post.comment_count ?? 0}</span>
           댓글
         </Link>
         {authorUsername && (
@@ -173,11 +180,14 @@ function PostFeedActions({ post }: { post: PostRow }) {
           </Link>
         )}
       </div>
-      <ShareButton
-        url={`/post/${post.id}`}
-        title={`@${authorUsername ?? "noai"}의 NOai 게시물`}
-        text={post.caption.slice(0, 80)}
-      />
+      <div className="flex shrink-0 items-center gap-1">
+        <SaveButton postId={post.id} initialSaved={!!post.saved_by_me} />
+        <ShareButton
+          url={`/post/${post.id}`}
+          title={`@${authorUsername ?? "noai"}의 NOai 게시물`}
+          text={post.caption.slice(0, 80)}
+        />
+      </div>
     </div>
   );
 }

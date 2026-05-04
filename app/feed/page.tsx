@@ -155,7 +155,45 @@ export default async function FeedPage() {
   }
 
   const { data: posts } = await query;
-  const rows = (posts ?? []) as unknown as PostRow[];
+  const baseRows = (posts ?? []) as unknown as PostRow[];
+  const postIds = baseRows.map((post) => post.id);
+  const [{ data: reactionRows }, { data: commentRows }, { data: savedRows }] =
+    postIds.length > 0
+      ? await Promise.all([
+          supabase.from("reactions").select("post_id, user_id").in("post_id", postIds),
+          supabase.from("comments").select("post_id").in("post_id", postIds),
+          supabase
+            .from("saved_posts")
+            .select("post_id")
+            .eq("user_id", user.id)
+            .in("post_id", postIds),
+        ])
+      : [{ data: [] }, { data: [] }, { data: [] }];
+  const reactionCountByPost = new Map<string, number>();
+  const commentCountByPost = new Map<string, number>();
+  const reactedByMe = new Set<string>();
+  const savedByMe = new Set((savedRows ?? []).map((row) => row.post_id));
+
+  for (const reaction of reactionRows ?? []) {
+    reactionCountByPost.set(
+      reaction.post_id,
+      (reactionCountByPost.get(reaction.post_id) ?? 0) + 1
+    );
+    if (reaction.user_id === user.id) reactedByMe.add(reaction.post_id);
+  }
+  for (const comment of commentRows ?? []) {
+    commentCountByPost.set(
+      comment.post_id,
+      (commentCountByPost.get(comment.post_id) ?? 0) + 1
+    );
+  }
+  const rows = baseRows.map((post) => ({
+    ...post,
+    reaction_count: reactionCountByPost.get(post.id) ?? 0,
+    comment_count: commentCountByPost.get(post.id) ?? 0,
+    reacted_by_me: reactedByMe.has(post.id),
+    saved_by_me: savedByMe.has(post.id),
+  }));
 
   return (
     <div className="relative z-10 flex flex-col flex-1 w-full">
