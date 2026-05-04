@@ -19,6 +19,8 @@ import { createStory } from "../actions";
 import type { ExifResult } from "@/lib/exif";
 import type { KeystrokeRecord } from "@/lib/keystroke";
 
+const MAX_STORY_IMAGE_BYTES = 8 * 1024 * 1024;
+
 export function StoryCreateClient() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [exif, setExif] = useState<ExifResult | null>(null);
@@ -113,6 +115,16 @@ export function StoryCreateClient() {
               setImageNote("스토리용 이미지로 최적화 중...");
               setExif(nextExif);
               const optimized = await optimizeStoryImage(file);
+              if (optimized.size > MAX_STORY_IMAGE_BYTES) {
+                setImageFile(null);
+                setError(
+                  `이미지가 너무 커요 (${formatBytes(
+                    optimized.size
+                  )}). 8MB 이하 JPG/PNG/WebP로 올려주세요.`
+                );
+                setImageNote("이미지 최적화 후에도 8MB를 넘어서 업로드를 막았습니다.");
+                return;
+              }
               setImageFile(optimized);
               setImageNote(
                 optimized.size < file.size

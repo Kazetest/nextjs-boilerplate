@@ -15,7 +15,10 @@ export async function createStory(formData: FormData): Promise<StoryResult> {
 
   if (!user) return { error: "로그인이 필요합니다" };
 
-  const { data: profile, error: profileError } = await supabase
+  const admin = createAdminClient();
+  const db = admin ?? supabase;
+
+  const { data: profile, error: profileError } = await db
     .from("profiles")
     .select("id")
     .eq("id", user.id)
@@ -30,7 +33,7 @@ export async function createStory(formData: FormData): Promise<StoryResult> {
 
   if (!profile) {
     const fallbackUsername = `user_${user.id.slice(0, 8)}`;
-    const { error: createProfileError } = await supabase
+    const { error: createProfileError } = await db
       .from("profiles")
       .insert({ id: user.id, username: fallbackUsername });
 
@@ -92,7 +95,6 @@ export async function createStory(formData: FormData): Promise<StoryResult> {
     ? ext
     : "jpg";
   const path = `${user.id}/${crypto.randomUUID()}.${safeExt}`;
-  const admin = createAdminClient();
   const storage = admin ?? supabase;
 
   if (admin) {
@@ -140,7 +142,7 @@ export async function createStory(formData: FormData): Promise<StoryResult> {
     data: { publicUrl },
   } = supabase.storage.from("stories").getPublicUrl(path);
 
-  const { data: inserted, error: insertError } = await supabase
+  const { data: inserted, error: insertError } = await db
     .from("stories")
     .insert({
       author_id: user.id,
@@ -170,12 +172,13 @@ export async function createStory(formData: FormData): Promise<StoryResult> {
 
 export async function markStoryViewed(storyId: string) {
   const supabase = await createClient();
+  const admin = createAdminClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return;
 
-  await supabase.from("story_views").upsert(
+  await (admin ?? supabase).from("story_views").upsert(
     {
       story_id: storyId,
       viewer_id: user.id,

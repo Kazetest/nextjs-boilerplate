@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { notFound, redirect } from "next/navigation";
 import { StoryViewerClient, type StoryItem } from "./StoryViewerClient";
 
@@ -15,10 +16,11 @@ export default async function StoryPage({
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+  const db = createAdminClient() ?? supabase;
 
   let cleaned = decodeURIComponent(username).replace(/^@/, "").toLowerCase();
   if (cleaned === "me") {
-    const { data: me } = await supabase
+    const { data: me } = await db
       .from("profiles")
       .select("username")
       .eq("id", user.id)
@@ -27,7 +29,7 @@ export default async function StoryPage({
     cleaned = me.username;
   }
 
-  const { data: profile } = await supabase
+  const { data: profile } = await db
     .from("profiles")
     .select("id, username, display_name, avatar_url")
     .eq("username", cleaned)
@@ -35,7 +37,7 @@ export default async function StoryPage({
 
   if (!profile) notFound();
 
-  const { data: stories } = await supabase
+  const { data: stories } = await db
     .from("stories")
     .select("id, image_url, caption, exif_data, ai_score, created_at, expires_at")
     .eq("author_id", profile.id)
@@ -46,7 +48,7 @@ export default async function StoryPage({
   const rows = (stories ?? []) as StoryItem[];
   if (rows.length === 0) notFound();
 
-  await supabase.from("story_views").upsert(
+  await db.from("story_views").upsert(
     rows.map((story) => ({
       story_id: story.id,
       viewer_id: user.id,
